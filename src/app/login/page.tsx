@@ -5,6 +5,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
 
+const LOCAL_USER_KEY = "pharmasens_user";
+
 export default function LoginPage() {
     const router = useRouter();
     const [email, setEmail] = useState("");
@@ -17,8 +19,14 @@ export default function LoginPage() {
         setError("");
         setLoading(true);
         try {
-            await login(email, password);
-            router.push("/dashboard");
+            const res = await login(email, password);
+            localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(res.user));
+
+            if (res.user.isNewUser || !res.user.hasUploadedData) {
+                router.push("/onboarding");
+            } else {
+                router.push("/dashboard");
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Login failed");
         } finally {
@@ -27,89 +35,105 @@ export default function LoginPage() {
     };
 
     return (
-        <div data-page-main="true" className="min-h-screen flex app-bg">
-            {/* Left panel */}
-            <div className="hidden lg:flex lg:w-1/2 gradient-bg relative overflow-hidden">
-                <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-[rgba(255,255,255,0.12)] rounded-full blur-2xl"></div>
-                <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[rgba(29,30,39,0.2)] rounded-full blur-3xl"></div>
-                <div className="relative z-10 flex flex-col justify-center px-16">
-                    <Link href="/" className="flex items-center gap-3 mb-12 no-underline">
-                        <div className="w-10 h-10 rounded-xl bg-[rgba(29,30,39,0.2)] flex items-center justify-center">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16" /><path d="M3 21h18" /></svg>
-                        </div>
-                        <span className="text-[var(--color-light-gray)] font-bold text-xl">PharmaSense AI</span>
-                    </Link>
-                    <h2 className="text-4xl font-bold text-[var(--color-light-gray)] mb-4 leading-tight">
-                        Intelligent Demand<br />Forecasting
-                    </h2>
-                    <p className="text-[rgba(191,191,191,1)] text-lg leading-relaxed max-w-md">
-                        Access real-time predictions, inventory optimization, and AI-powered
-                        insights for your pharmaceutical supply chain.
-                    </p>
-                </div>
-            </div>
+        <div data-page-main="true" className="relative min-h-screen overflow-hidden bg-[#0D1117] text-[#C9D1D9]">
+            <div
+                className="pointer-events-none absolute inset-0 opacity-25"
+                style={{
+                    backgroundImage:
+                        "repeating-linear-gradient(90deg, rgba(218,54,51,0.14) 0px, rgba(218,54,51,0.14) 1px, transparent 1px, transparent 40px)",
+                }}
+            />
+            <div
+                className="pointer-events-none absolute inset-0"
+                style={{
+                    background:
+                        "radial-gradient(ellipse 50% 36% at 50% -10%, rgba(218,54,51,0.3) 0%, transparent 75%)",
+                }}
+            />
 
-            {/* Right panel - form */}
-            <div className="flex-1 flex items-center justify-center px-6 py-12 bg-[rgba(29,30,39,0.7)]">
-                <div className="w-full max-w-md">
-                    <div className="lg:hidden mb-8">
-                        <Link href="/" className="flex items-center gap-2 no-underline text-[var(--color-light-gray)]">
-                            <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5"><path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16" /><path d="M3 21h18" /></svg>
+            <main className="relative z-10 flex min-h-screen items-center justify-center px-6 py-10 lg:px-8 lg:py-14">
+                <div className="grid w-full max-w-6xl overflow-hidden border border-[rgba(255,255,255,0.12)] bg-[#0D1117] lg:grid-cols-12">
+                    <section className="border-b border-[rgba(255,255,255,0.12)] p-8 lg:col-span-5 lg:border-b-0 lg:border-r lg:p-10">
+                        <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[rgba(218,54,51,0.4)] bg-[rgba(218,54,51,0.12)] px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[#F85149]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#F85149]" />
+                            Secure Access
+                        </p>
+                        <h1 className="text-3xl font-light leading-tight text-white sm:text-4xl">
+                            Welcome Back To
+                            <br />
+                            PharmaSense
+                        </h1>
+                        <p className="mt-4 max-w-sm text-sm leading-relaxed text-[#8B949E] sm:text-base">
+                            Sign in to monitor forecast shifts, stock alerts, and regional demand signals in a single dashboard.
+                        </p>
+
+                        <div className="mt-8 space-y-3 text-sm text-[#8B949E]">
+                            <div className="flex items-center gap-3 border border-[rgba(255,255,255,0.1)] bg-[#161B22] px-4 py-3">
+                                <span className="h-2 w-2 rounded-full bg-[#F85149]" />
+                                Real-time demand trend visibility
                             </div>
-                            <span className="font-bold">PharmaSense AI</span>
-                        </Link>
-                    </div>
-
-                    <h1 className="text-3xl font-bold text-[var(--color-light-gray)] mb-2">Welcome back</h1>
-                    <p className="text-[rgba(191,191,191,1)] mb-8">Sign in to your account to continue</p>
-
-                    {error && (
-                        <div className="mb-6 p-4 rounded-xl bg-[rgba(255,0,0,0.16)] border border-[rgba(255,0,0,0.3)] text-[var(--color-primary)] text-sm font-medium">
-                            {error}
+                            <div className="flex items-center gap-3 border border-[rgba(255,255,255,0.1)] bg-[#161B22] px-4 py-3">
+                                <span className="h-2 w-2 rounded-full bg-[#60A5FA]" />
+                                Inventory risk and reorder recommendations
+                            </div>
+                            <div className="flex items-center gap-3 border border-[rgba(255,255,255,0.1)] bg-[#161B22] px-4 py-3">
+                                <span className="h-2 w-2 rounded-full bg-[#34D399]" />
+                                AI model insights and forecast confidence
+                            </div>
                         </div>
-                    )}
+                    </section>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        <div>
-                            <label className="block text-sm font-medium text-[rgba(191,191,191,1)] mb-1.5">Email</label>
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="input-field"
-                                placeholder="you@example.com"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-[rgba(191,191,191,1)] mb-1.5">Password</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="input-field"
-                                placeholder="Enter your password"
-                                required
-                            />
-                        </div>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="btn-primary gsap-btn w-full justify-center text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? "Signing in..." : "Sign In"}
-                        </button>
-                    </form>
+                    <section className="p-8 lg:col-span-7 lg:p-10">
+                        <h2 className="text-2xl font-light text-white">Sign in</h2>
+                        <p className="mt-2 text-sm text-[#8B949E]">Continue to your pharmaceutical demand workspace.</p>
 
-                    <p className="text-center text-sm text-[rgba(191,191,191,1)] mt-8">
-                        Don&#39;t have an account?{" "}
-                        <Link href="/signup" className="text-[var(--color-primary)] font-semibold hover:text-[var(--color-deep-red)]">
-                            Create one
-                        </Link>
-                    </p>
+                        {error && (
+                            <div className="mt-6 border border-[rgba(248,81,73,0.4)] bg-[rgba(248,81,73,0.12)] px-4 py-3 text-sm text-[#FCA5A5]">
+                                {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="mt-7 space-y-5">
+                            <div>
+                                <label className="mb-1.5 block text-xs uppercase tracking-widest text-[#8B949E]">Email</label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="input-field"
+                                    placeholder="you@example.com"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1.5 block text-xs uppercase tracking-widest text-[#8B949E]">Password</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="input-field"
+                                    placeholder="Enter your password"
+                                    required
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="btn-primary gsap-btn w-full justify-center text-base disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {loading ? "Signing in..." : "Sign In"}
+                            </button>
+                        </form>
+
+                        <p className="mt-7 text-sm text-[#8B949E]">
+                            Don&#39;t have an account?{" "}
+                            <Link href="/signup" className="font-semibold text-[#F85149] hover:text-[#FF7B72]">
+                                Create one
+                            </Link>
+                        </p>
+                    </section>
                 </div>
-            </div>
+            </main>
         </div>
     );
 }

@@ -6,6 +6,7 @@ from routes.dashboard import dashboard_bp
 from routes.forecast import forecast_bp
 from routes.inventory import inventory_bp
 from routes.insights import insights_bp
+from routes.onboarding import onboarding_bp
 
 
 def create_app():
@@ -17,6 +18,7 @@ def create_app():
     app.register_blueprint(forecast_bp)
     app.register_blueprint(inventory_bp)
     app.register_blueprint(insights_bp)
+    app.register_blueprint(onboarding_bp)
 
     @app.route("/api/health", methods=["GET"])
     def health():
