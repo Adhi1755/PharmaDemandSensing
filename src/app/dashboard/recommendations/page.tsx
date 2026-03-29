@@ -21,23 +21,23 @@ const severityStyles: Record<string, { card: string; badge: string; icon: string
     },
     high: {
         card: "border-l-4 border-l-[var(--color-deep-red)]",
-        badge: "bg-[rgba(192,0,24,0.22)] text-[var(--color-primary)]",
+        badge: "bg-[rgba(255,77,77,0.22)] text-[var(--color-primary)]",
         icon: "text-[var(--color-deep-red)]",
     },
     medium: {
-        card: "border-l-4 border-l-[rgba(224,226,228,0.8)]",
-        badge: "bg-[rgba(224,226,228,0.14)] text-[var(--color-light-gray)]",
+        card: "border-l-4 border-l-[rgba(191,191,191,1)]",
+        badge: "bg-[rgba(255,255,255,0.12)] text-[var(--color-light-gray)]",
         icon: "text-[var(--color-light-gray)]",
     },
     low: {
-        card: "border-l-4 border-l-[rgba(224,226,228,0.6)]",
-        badge: "bg-[rgba(224,226,228,0.12)] text-[var(--color-light-gray)]",
+        card: "border-l-4 border-l-[rgba(128,128,128,1)]",
+        badge: "bg-[rgba(255,255,255,0.12)] text-[var(--color-light-gray)]",
         icon: "text-[var(--color-light-gray)]",
     },
     info: {
-        card: "border-l-4 border-l-[rgba(224,226,228,0.5)]",
-        badge: "bg-[rgba(224,226,228,0.1)] text-[rgba(224,226,228,0.82)]",
-        icon: "text-[rgba(224,226,228,0.82)]",
+        card: "border-l-4 border-l-[rgba(128,128,128,1)]",
+        badge: "bg-[rgba(255,255,255,0.12)] text-[rgba(191,191,191,1)]",
+        icon: "text-[rgba(191,191,191,1)]",
     },
 };
 
@@ -75,20 +75,20 @@ export default function RecommendationsPage() {
     return (
         <>
             <Navbar title="AI Recommendations" subtitle="Intelligent insights and actionable suggestions" />
-            <div className="p-0">
-                <div className="border border-[rgba(255,255,255,0.08)] bg-[#1D1E27]">
+            <div className="min-h-full bg-black p-0">
+                <div className="border border-[rgba(255,255,255,0.12)] bg-[#000000]">
                 {/* Summary */}
-                <section className="grid grid-cols-1 sm:grid-cols-3 gap-0 scroll-section border-b border-[rgba(255,255,255,0.08)]">
-                    <div className="p-5 border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
-                        <p className="text-sm text-[rgba(224,226,228,0.72)]">Total Insights</p>
+                <section className="grid grid-cols-1 sm:grid-cols-3 gap-0 scroll-section border-b border-[rgba(255,255,255,0.12)]">
+                    <div className="p-5 border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.12)] dashboard-card">
+                        <p className="text-sm text-[rgba(191,191,191,1)]">Total Insights</p>
                         <p className="text-3xl font-bold text-[var(--color-light-gray)] mt-1">{insights.length}</p>
                     </div>
-                    <div className="p-5 border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
-                        <p className="text-sm text-[rgba(224,226,228,0.72)]">Critical Actions</p>
+                    <div className="p-5 border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.12)] dashboard-card">
+                        <p className="text-sm text-[rgba(191,191,191,1)]">Critical Actions</p>
                         <p className="text-3xl font-bold text-[var(--color-primary)] mt-1">{criticalCount}</p>
                     </div>
                     <div className="p-5 dashboard-card">
-                        <p className="text-sm text-[rgba(224,226,228,0.72)]">High Priority</p>
+                        <p className="text-sm text-[rgba(191,191,191,1)]">High Priority</p>
                         <p className="text-3xl font-bold text-[var(--color-deep-red)] mt-1">{highCount}</p>
                     </div>
                 </section>
@@ -99,7 +99,7 @@ export default function RecommendationsPage() {
                         const style = severityStyles[insight.severity] || severityStyles.info;
                         const icon = typeIcons[insight.type] || typeIcons.model_performance;
                         return (
-                            <div key={i} className={`p-6 border-b border-[rgba(255,255,255,0.08)] ${style.card} dashboard-card`}>
+                            <div key={i} className={`p-6 border-b border-[rgba(255,255,255,0.12)] ${style.card} dashboard-card`}>
                                 <div className="flex items-start gap-4">
                                     <div className={`shrink-0 mt-0.5 ${style.icon}`}>{icon}</div>
                                     <div className="flex-1">
@@ -109,9 +109,9 @@ export default function RecommendationsPage() {
                                                 {insight.severity}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-[rgba(224,226,228,0.78)] leading-relaxed mb-3">{insight.message}</p>
-                                        <div className="bg-[rgba(29,30,39,0.62)] p-3.5 border border-[rgba(224,226,228,0.14)]">
-                                            <p className="text-xs font-semibold text-[rgba(224,226,228,0.72)] uppercase tracking-wider mb-1">
+                                        <p className="text-sm text-[rgba(191,191,191,1)] leading-relaxed mb-3">{insight.message}</p>
+                                        <div className="bg-[rgba(26,26,26,0.72)] p-3.5 border border-[rgba(255,255,255,0.12)]">
+                                            <p className="text-xs font-semibold text-[rgba(191,191,191,1)] uppercase tracking-wider mb-1">
                                                 Recommended Action
                                             </p>
                                             <p className="text-sm text-[var(--color-light-gray)] font-medium">{insight.action}</p>

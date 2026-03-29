@@ -148,17 +148,11 @@ export default function Sidebar() {
                 ref={desktopSidebarRef}
                 onMouseEnter={handleExpand}
                 onMouseLeave={handleCollapse}
-                className="hidden lg:flex flex-col bg-[var(--color-dark-gray)] h-full fixed left-0 top-0 z-40 border-r border-gray-700/20 overflow-hidden"
+                className="hidden lg:flex flex-col bg-[#000000] h-full fixed left-0 top-0 z-40 border-r border-[rgba(255,255,255,0.18)] overflow-hidden"
             >
-                <div className="sidebar-header py-5 px-3 border-b border-gray-700/20">
-                    <Link href="/" className="sidebar-brand flex items-center justify-center gap-3 no-underline">
-                        <div className="w-9 h-9 gradient-bg flex items-center justify-center border border-gray-700/20">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E0E2E4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16" /><path d="M3 21h18" /><path d="M9 7h1" /><path d="M9 11h1" /><path d="M9 15h1" /><path d="M14 7h1" /><path d="M14 11h1" /><path d="M14 15h1" /></svg>
-                        </div>
-                        <div className="sidebar-text whitespace-nowrap">
-                            <span className="text-[var(--color-light-gray)] font-bold text-lg leading-tight block">PharmaSense</span>
-                            <span className="text-[rgba(224,226,228,0.72)] text-xs">AI Demand Sensing</span>
-                        </div>
+                <div className="sidebar-header h-16 px-3 border-b border-[rgba(255,255,255,0.18)] flex items-center">
+                    <Link href="/" className="sidebar-brand flex items-center justify-center gap-0 no-underline w-full">
+                        <span className="text-[var(--color-primary)] text-4xl font-light leading-none">+</span>
                     </Link>
                 </div>
 
@@ -172,15 +166,15 @@ export default function Sidebar() {
                                 key={item.href}
                                 href={item.href}
                                 data-sidebar-active={isActive}
-                                className={`sidebar-item relative group flex items-center justify-center gap-3 px-4 py-3 border-b border-gray-700/20 text-sm font-medium transition-colors duration-200 no-underline ${isActive
+                                className={`sidebar-item relative group flex items-center justify-center gap-3 px-4 py-3 border-b border-[rgba(255,255,255,0.12)] text-sm font-medium transition-colors duration-200 no-underline ${isActive
                                         ? "text-[var(--color-light-gray)]"
-                                        : "text-[rgba(224,226,228,0.72)] hover:text-[var(--color-light-gray)] hover:bg-[rgba(255,0,0,0.12)]"
+                                        : "text-[rgba(191,191,191,1)] hover:text-[var(--color-light-gray)] hover:bg-[rgba(255,0,0,0.12)]"
                                     }`}
-                                style={isActive ? { background: "linear-gradient(90deg, rgba(192, 0, 24, 0.42), rgba(255, 0, 0, 0.2))" } : undefined}
+                                style={isActive ? { background: "linear-gradient(90deg, rgba(255, 77, 77, 0.3), rgba(255, 0, 0, 0.18))" } : undefined}
                             >
                                 <span className={isActive ? "text-[var(--color-primary)]" : ""}>{item.icon}</span>
                                 <span className="sidebar-text whitespace-nowrap">{item.label}</span>
-                                <span className="sidebar-tooltip pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 border border-gray-700/20 bg-[rgba(0,0,0,0.96)] px-2 py-1 text-xs text-[var(--color-light-gray)] opacity-0 transition-opacity duration-150 whitespace-nowrap z-50">
+                                <span className="sidebar-tooltip pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 border border-[rgba(255,255,255,0.12)] bg-[rgba(0,0,0,0.96)] px-2 py-1 text-xs text-[var(--color-light-gray)] opacity-0 transition-opacity duration-150 whitespace-nowrap z-50">
                                     {item.label}
                                 </span>
                             </Link>
@@ -188,14 +182,24 @@ export default function Sidebar() {
                     })}
                 </nav>
 
-                <div className="border-t border-gray-700/20">
+                <div className="border-t border-[rgba(255,255,255,0.12)]">
+                    <button
+                        type="button"
+                        className="sidebar-item relative group w-full flex items-center justify-center gap-3 px-4 py-3 text-sm font-medium text-[rgba(191,191,191,1)] hover:text-[var(--color-light-gray)] hover:bg-[rgba(255,0,0,0.12)] transition-colors duration-200"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21a8 8 0 1 0-16 0" /><circle cx="12" cy="7" r="4" /></svg>
+                        <span className="sidebar-text whitespace-nowrap">Profile</span>
+                        <span className="sidebar-tooltip pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 border border-[rgba(255,255,255,0.12)] bg-[rgba(0,0,0,0.96)] px-2 py-1 text-xs text-[var(--color-light-gray)] opacity-0 transition-opacity duration-150 whitespace-nowrap z-50">
+                            Profile
+                        </span>
+                    </button>
                     <Link
                         href="/"
-                        className="sidebar-item relative group flex items-center justify-center gap-3 px-4 py-3 text-sm font-medium text-[rgba(224,226,228,0.72)] hover:text-[var(--color-light-gray)] hover:bg-[rgba(255,0,0,0.12)] transition-colors duration-200 no-underline"
+                        className="sidebar-item relative group flex items-center justify-center gap-3 px-4 py-3 text-sm font-medium text-[rgba(191,191,191,1)] hover:text-[var(--color-light-gray)] hover:bg-[rgba(255,0,0,0.12)] transition-colors duration-200 no-underline"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
                         <span className="sidebar-text whitespace-nowrap">Logout</span>
-                        <span className="sidebar-tooltip pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 border border-gray-700/20 bg-[rgba(0,0,0,0.96)] px-2 py-1 text-xs text-[var(--color-light-gray)] opacity-0 transition-opacity duration-150 whitespace-nowrap z-50">
+                        <span className="sidebar-tooltip pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 border border-[rgba(255,255,255,0.12)] bg-[rgba(0,0,0,0.96)] px-2 py-1 text-xs text-[var(--color-light-gray)] opacity-0 transition-opacity duration-150 whitespace-nowrap z-50">
                             Logout
                         </span>
                     </Link>
@@ -203,7 +207,7 @@ export default function Sidebar() {
             </aside>
 
             {/* Mobile bottom nav */}
-            <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--color-dark-gray)] border-t border-gray-700/20 z-50 flex justify-around py-2 px-0">
+            <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#000000] border-t border-[rgba(255,255,255,0.12)] z-50 flex justify-around py-2 px-0">
                 {navItems.slice(0, 5).map((item) => {
                     const isActive =
                         pathname === item.href ||
@@ -212,7 +216,7 @@ export default function Sidebar() {
                         <Link
                             key={item.href}
                             href={item.href}
-                            className={`flex flex-col items-center gap-1 px-2 py-1.5 text-[10px] font-medium transition-colors no-underline ${isActive ? "text-[var(--color-primary)]" : "text-[rgba(224,226,228,0.72)] hover:text-[var(--color-light-gray)]"
+                            className={`flex flex-col items-center gap-1 px-2 py-1.5 text-[10px] font-medium transition-colors no-underline ${isActive ? "text-[var(--color-primary)]" : "text-[rgba(191,191,191,1)] hover:text-[var(--color-light-gray)]"
                                 }`}
                         >
                             {item.icon}

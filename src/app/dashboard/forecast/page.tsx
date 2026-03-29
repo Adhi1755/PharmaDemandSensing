@@ -61,20 +61,20 @@ export default function ForecastPage() {
     return (
         <>
             <Navbar title="Demand Forecast" subtitle="Historical and predicted demand analysis" />
-            <div className="p-0">
-                <div className="scroll-section border border-[rgba(255,255,255,0.08)] bg-[#1D1E27]">
+            <div className="min-h-full bg-black p-0">
+                <div className="scroll-section border border-[rgba(255,255,255,0.12)] bg-[#000000]">
                     {/* Controls */}
-                    <section className="p-6 border-b border-[rgba(255,255,255,0.08)]">
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-0 border border-[rgba(255,255,255,0.08)]">
-                            <div className="sm:col-span-9 p-4 border-b sm:border-b-0 sm:border-r border-[rgba(255,255,255,0.08)]">
-                                <label className="block text-sm font-medium text-[rgba(224,226,228,0.86)] mb-1.5">Select Drug</label>
+                    <section className="p-6 border-b border-[rgba(255,255,255,0.12)]">
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-0 border border-[rgba(255,255,255,0.12)]">
+                            <div className="sm:col-span-9 p-4 border-b sm:border-b-0 sm:border-r border-[rgba(255,255,255,0.12)]">
+                                <label className="block text-sm font-medium text-[rgba(191,191,191,1)] mb-1.5">Select Drug</label>
                                 <select
                                     value={selectedDrug}
                                     onChange={(e) => {
                                         setLoading(true);
                                         setSelectedDrug(e.target.value);
                                     }}
-                                    className="w-full px-3 py-2.5 bg-[rgba(13,15,18,0.72)] border border-[rgba(255,255,255,0.08)] text-[var(--color-light-gray)] text-sm outline-none"
+                                    className="w-full px-3 py-2.5 bg-[rgba(13,15,18,0.72)] border border-[rgba(255,255,255,0.12)] text-[var(--color-light-gray)] text-sm outline-none"
                                 >
                                     {drugs.map((d) => (
                                         <option key={d.id} value={d.name}>{d.name} ({d.category})</option>
@@ -82,8 +82,8 @@ export default function ForecastPage() {
                                 </select>
                             </div>
                             <div className="sm:col-span-3 p-4">
-                                <label className="block text-sm font-medium text-[rgba(224,226,228,0.86)] mb-1.5">Forecast Horizon</label>
-                                <div className="grid grid-cols-2 gap-0 border border-[rgba(255,255,255,0.08)]">
+                                <label className="block text-sm font-medium text-[rgba(191,191,191,1)] mb-1.5">Forecast Horizon</label>
+                                <div className="grid grid-cols-2 gap-0 border border-[rgba(255,255,255,0.12)]">
                                     {[7, 30].map((h) => (
                                         <button
                                             key={h}
@@ -91,9 +91,9 @@ export default function ForecastPage() {
                                                 setLoading(true);
                                                 setHorizon(h);
                                             }}
-                                            className={`py-2.5 text-sm font-semibold border-r last:border-r-0 border-[rgba(255,255,255,0.08)] transition-colors gsap-btn ${horizon === h
+                                            className={`py-2.5 text-sm font-semibold border-r last:border-r-0 border-[rgba(255,255,255,0.12)] transition-colors gsap-btn ${horizon === h
                                                     ? "bg-[var(--color-deep-red)] text-[var(--color-light-gray)]"
-                                                    : "bg-[rgba(13,15,18,0.72)] text-[rgba(224,226,228,0.78)] hover:bg-[rgba(255,0,0,0.16)]"
+                                                    : "bg-[rgba(13,15,18,0.72)] text-[rgba(191,191,191,1)] hover:bg-[rgba(255,0,0,0.16)]"
                                                 }`}
                                         >
                                             {h} Days
@@ -105,11 +105,11 @@ export default function ForecastPage() {
                     </section>
 
                 {/* Chart */}
-                <section className="p-6 border-b border-[rgba(255,255,255,0.08)] dashboard-card chart-section">
+                <section className="p-6 border-b border-[rgba(255,255,255,0.12)] dashboard-card chart-section">
                     <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">
                         {selectedDrug} - Demand Forecast
                     </h2>
-                    <p className="text-sm text-[rgba(224,226,228,0.72)] mb-6">
+                    <p className="text-sm text-[rgba(191,191,191,1)] mb-6">
                         Historical demand (90 days) and {horizon}-day forecast with confidence intervals
                     </p>
 
@@ -125,28 +125,28 @@ export default function ForecastPage() {
                                             <stop offset="95%" stopColor="#FF0000" stopOpacity={0.04} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(224,226,228,0.16)" />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" />
                                     <XAxis
                                         dataKey="date"
-                                        tick={{ fontSize: 10, fill: "#E0E2E4" }}
+                                        tick={{ fontSize: 10, fill: "#FFFFFF" }}
                                         tickFormatter={(v) => v.slice(5)}
                                         axisLine={false}
                                         tickLine={false}
                                         interval="preserveStartEnd"
                                     />
                                     <YAxis
-                                        tick={{ fontSize: 11, fill: "#E0E2E4" }}
+                                        tick={{ fontSize: 11, fill: "#FFFFFF" }}
                                         axisLine={false}
                                         tickLine={false}
-                                        label={{ value: "Units", angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "#E0E2E4" } }}
+                                        label={{ value: "Units", angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "#FFFFFF" } }}
                                     />
                                     <Tooltip
                                         contentStyle={{
                                             borderRadius: 12,
-                                            border: "1px solid rgba(224,226,228,0.18)",
+                                            border: "1px solid rgba(255,255,255,0.12)",
                                             backgroundColor: "#000000",
                                             fontSize: 13,
-                                            color: "#E0E2E4",
+                                            color: "#FFFFFF",
                                         }}
                                     />
                                     <Legend verticalAlign="top" height={36} />
@@ -167,7 +167,7 @@ export default function ForecastPage() {
                                     <Line
                                         type="monotone"
                                         dataKey="historical"
-                                        stroke="#E0E2E4"
+                                        stroke="#FFFFFF"
                                         strokeWidth={2}
                                         dot={false}
                                         name="Historical"
@@ -192,26 +192,26 @@ export default function ForecastPage() {
                 {/* Forecast Summary */}
                 {data && (
                     <section className="grid grid-cols-1 sm:grid-cols-3 gap-0 scroll-section">
-                        <div className="p-5 text-center border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
-                            <p className="text-sm text-[rgba(224,226,228,0.72)] mb-1">Avg Predicted Demand</p>
+                        <div className="p-5 text-center border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.12)] dashboard-card">
+                            <p className="text-sm text-[rgba(191,191,191,1)] mb-1">Avg Predicted Demand</p>
                             <p className="text-2xl font-bold text-[var(--color-primary)]">
                                 {Math.round(data.forecast.reduce((s, f) => s + f.predicted, 0) / data.forecast.length)}
                             </p>
-                            <p className="text-xs text-[rgba(224,226,228,0.62)] mt-1">units/day</p>
+                            <p className="text-xs text-[rgba(128,128,128,1)] mt-1">units/day</p>
                         </div>
-                        <div className="p-5 text-center border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
-                            <p className="text-sm text-[rgba(224,226,228,0.72)] mb-1">Total Forecast</p>
+                        <div className="p-5 text-center border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.12)] dashboard-card">
+                            <p className="text-sm text-[rgba(191,191,191,1)] mb-1">Total Forecast</p>
                             <p className="text-2xl font-bold text-[var(--color-deep-red)]">
                                 {data.forecast.reduce((s, f) => s + f.predicted, 0).toLocaleString()}
                             </p>
-                            <p className="text-xs text-[rgba(224,226,228,0.62)] mt-1">units over {horizon} days</p>
+                            <p className="text-xs text-[rgba(128,128,128,1)] mt-1">units over {horizon} days</p>
                         </div>
                         <div className="p-5 text-center dashboard-card">
-                            <p className="text-sm text-[rgba(224,226,228,0.72)] mb-1">Forecast Range</p>
+                            <p className="text-sm text-[rgba(191,191,191,1)] mb-1">Forecast Range</p>
                             <p className="text-2xl font-bold text-[var(--color-light-gray)]">
                                 {Math.min(...data.forecast.map(f => f.lower_bound))} - {Math.max(...data.forecast.map(f => f.upper_bound))}
                             </p>
-                            <p className="text-xs text-[rgba(224,226,228,0.62)] mt-1">confidence interval</p>
+                            <p className="text-xs text-[rgba(128,128,128,1)] mt-1">confidence interval</p>
                         </div>
                     </section>
                 )}

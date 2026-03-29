@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${dmSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-[family-name:var(--font-inter)]">
+      <body className="h-full min-h-screen bg-black m-0 p-0 flex flex-col overflow-x-hidden font-[family-name:var(--font-inter)]">
         <GlobalMotion />
         {children}
       </body>
