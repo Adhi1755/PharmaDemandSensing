@@ -136,7 +136,7 @@ const communityLinks = [
 
 // ─── Components ──────────────────────────────────────────────────────────────
 
-function WhyCard({ title, description, icon, color }) {
+function WhyCard({ title, description, icon, color }: { title: string; description: string; icon: React.ReactNode; color: string }) {
   return (
     <article className="reveal-card border-b border-r border-[rgba(255,255,255,0.07)] p-8 hover:bg-[rgba(255,255,255,0.03)] transition-colors duration-200">
       <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-lg ${color}`}>
@@ -148,22 +148,22 @@ function WhyCard({ title, description, icon, color }) {
   );
 }
 
-function ModelCard({ name, detail, note, badge, badgeColor }) {
+function ModelCard({ name, detail, note, badge, badgeColor }: { name: string; detail: string; note: string; badge: string; badgeColor: string }) {
   return (
-    <article className="reveal-card rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[#161B22] p-7 hover:border-[rgba(255,255,255,0.2)] transition-all duration-200">
+    <article className="reveal-card  border border-[rgba(255,255,255,0.1)] bg-[#161B22] p-7 hover:border-[rgba(255,255,255,0.2)] transition-all duration-200">
       <div className="flex items-start justify-between mb-4">
         <h3 className="text-xl font-light text-white leading-tight">{name}</h3>
         <span className={`ml-3 shrink-0 rounded-full px-3 py-1 text-xs font-light ${badgeColor}`}>{badge}</span>
       </div>
       <p className="text-sm leading-relaxed text-[#8B949E]">{detail}</p>
-      <p className="mt-5 text-xs font-light uppercase tracking-[0.12em] text-[#6E7681]">{note}</p>
+      <p className="mt-5 text-xs font-light uppercase tracking-widest text-[#6E7681]">{note}</p>
     </article>
   );
 }
 
-function StepCard({ num, title, description, time, code }) {
+function StepCard({ num, title, description, time, code }: { num: string; title: string; description: string; time: string; code: string | null }) {
   return (
-    <article className="reveal-card rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[#161B22] overflow-hidden">
+    <article className="reveal-card  border border-[rgba(255,255,255,0.1)] bg-[#161B22] overflow-hidden">
       <div className="p-6">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#DA3633] mb-5">
           <span className="text-lg font-light text-white">{num}</span>
@@ -209,13 +209,41 @@ export default function LandingPage() {
         stagger: 0.12,
       });
 
-      gsap.utils.toArray("[data-reveal-section]").forEach((section) => {
-        const cards = section.querySelectorAll(".reveal-card, .reveal-item");
-        if (!cards.length) {
-          gsap.from(section, { opacity: 0, y: 20, duration: 0.6, ease: "power2.out", scrollTrigger: { trigger: section, start: "top 86%" } });
-          return;
+      gsap.utils.toArray<HTMLElement>("[data-reveal-section]").forEach((section) => {
+        const cards = section.querySelectorAll(".reveal-card");
+        const items = section.querySelectorAll(".reveal-item");
+        
+        // Animate reveal-item elements (headings, paragraphs)
+        if (items.length) {
+          gsap.from(items, {
+            opacity: 0,
+            y: 20,
+            duration: 0.6,
+            ease: "power2.out",
+            stagger: 0.1,
+            scrollTrigger: {
+              trigger: section,
+              start: "top 85%",
+              markers: false,
+            },
+          });
         }
-        gsap.from(cards, { opacity: 0, y: 16, duration: 0.55, ease: "power2.out", stagger: 0.07, scrollTrigger: { trigger: section, start: "top 84%" } });
+        
+        // Animate reveal-card elements separately
+        if (cards.length) {
+          gsap.from(cards, {
+            opacity: 0,
+            y: 16,
+            duration: 0.55,
+            ease: "power2.out",
+            stagger: 0.08,
+            scrollTrigger: {
+              trigger: section,
+              start: "top 84%",
+              markers: false,
+            },
+          });
+        }
       });
     }, pageRef);
     return () => ctx.revert();
@@ -252,7 +280,7 @@ export default function LandingPage() {
             style={{ background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(218,54,51,0.25) 0%, transparent 70%)" }} />
 
           <div className="relative mx-auto flex min-h-[80vh] w-full max-w-4xl flex-col items-center justify-center px-6 py-24 text-center lg:px-10">
-            <p data-hero-item className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgba(218,54,51,0.4)] bg-[rgba(218,54,51,0.1)] px-4 py-1.5 text-xs font-light uppercase tracking-[0.1em] text-[#F85149]">
+            <p data-hero-item className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgba(218,54,51,0.4)] bg-[rgba(218,54,51,0.1)] px-4 py-1.5 text-xs font-light uppercase tracking-widest text-[#F85149]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#F85149]" />
               Multi-model AI system · Supports real-world datasets
             </p>
@@ -287,7 +315,7 @@ export default function LandingPage() {
         {/* ── Trusted by banner ──────────────────────────────────────────── */}
         <section data-reveal-section className="border-b border-[rgba(255,255,255,0.06)] bg-[#0D1117] py-8">
           <div className="mx-auto flex w-full max-w-7xl flex-col items-center px-6 lg:px-10">
-            <p className="reveal-item mb-6 text-xs font-light uppercase tracking-[0.12em] text-[#6E7681]">
+            <p className="reveal-item mb-6 text-xs font-light uppercase tracking-widest text-[#6E7681]">
               Built for real-world AI workflows inspired by modern ML systems
             </p>
           </div>
@@ -356,7 +384,7 @@ export default function LandingPage() {
               ))}
             </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="mt-6 grid grid-cols-1  md:grid-cols-3">
               {steps.map((step) => (
                 <StepCard key={step.num} {...step} />
               ))}
@@ -367,9 +395,11 @@ export default function LandingPage() {
         {/* ── Models ──────────────────────────────────────────────────────── */}
         <section id="models" data-reveal-section className="border-b border-[rgba(255,255,255,0.06)] bg-[#0D1117] py-24">
           <div className="mx-auto w-full max-w-7xl px-6 lg:px-10">
-            <h2 className="reveal-item text-4xl font-light text-white sm:text-5xl">Powered by Multiple AI Models</h2>
-            <p className="reveal-item mt-5 max-w-2xl text-base text-[#8B949E]">Switch between models to compare performance and accuracy for your specific demand patterns.</p>
-            <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="mb-12">
+              <h2 className="reveal-item text-4xl font-light text-white sm:text-5xl">Powered by Multiple AI Models</h2>
+              <p className="reveal-item mt-5 max-w-2xl text-base text-[#8B949E]">Switch between models to compare performance and accuracy for your specific demand patterns.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               {models.map((m) => (
                 <ModelCard key={m.name} {...m} />
               ))}
@@ -384,7 +414,7 @@ export default function LandingPage() {
             <p className="reveal-item mt-4 text-base text-[#8B949E]">Live dashboard preview of what you&apos;ll see after running the pipeline.</p>
             <div className="mt-10 grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="reveal-card lg:col-span-2 rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[#161B22] p-7">
-                <p className="text-xs uppercase tracking-[0.1em] text-[#6E7681] mb-1">Dashboard Preview</p>
+                <p className="text-xs uppercase tracking-widest text-[#6E7681] mb-1">Dashboard Preview</p>
                 <p className="text-xl font-light text-white mb-6">Demand Forecast Chart</p>
                 <div className="h-44 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0D1117] p-4 flex items-end gap-1.5">
                   {[28, 42, 35, 55, 48, 64, 40, 58, 72, 65, 78, 70].map((h, i) => (
@@ -394,17 +424,17 @@ export default function LandingPage() {
               </div>
               <div className="flex flex-col gap-4">
                 <div className="reveal-card flex-1 rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[#161B22] p-6">
-                  <p className="text-xs uppercase tracking-[0.1em] text-[#6E7681]">Accuracy</p>
+                  <p className="text-xs uppercase tracking-widest text-[#6E7681]">Accuracy</p>
                   <p className="mt-2 text-4xl font-extralight text-white">92.3%</p>
                 </div>
                 <div className="reveal-card flex-1 rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[#161B22] p-6">
-                  <p className="text-xs uppercase tracking-[0.1em] text-[#6E7681]">Demand Risk</p>
+                  <p className="text-xs uppercase tracking-widest text-[#6E7681]">Demand Risk</p>
                   <p className="mt-2 text-4xl font-extralight text-[#4ADE80]">Low</p>
                 </div>
               </div>
             </div>
             <div className="reveal-card mt-4 rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[#161B22] p-6">
-              <p className="text-xs uppercase tracking-[0.1em] text-[#6E7681] mb-4">AI Recommendations</p>
+              <p className="text-xs uppercase tracking-widest text-[#6E7681] mb-4">AI Recommendations</p>
               <ul className="flex flex-col gap-3 text-sm text-[#8B949E]">
                 {["Increase reorder quantity for high-volatility SKUs.", "Reduce buffer stock for low-turnover antibiotics.", "Schedule weekly demand review for seasonal spikes."].map((rec) => (
                   <li key={rec} className="flex items-start gap-3">
@@ -420,7 +450,7 @@ export default function LandingPage() {
         {/* ── Community / Connect ─────────────────────────────────────────── */}
         <section data-reveal-section className="border-b border-[rgba(255,255,255,0.06)] bg-[#0D1117] py-24">
           <div className="mx-auto w-full max-w-5xl px-6 text-center lg:px-10">
-            <p className="reveal-item mb-4 inline-flex items-center gap-2 text-xs font-light uppercase tracking-[0.12em] text-[#DA3633]">
+            <p className="reveal-item mb-4 inline-flex items-center gap-2 text-xs font-light uppercase tracking-widest text-[#DA3633]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#DA3633]" /> GET INVOLVED
             </p>
             <h2 className="reveal-item text-4xl font-light text-white sm:text-5xl">Connect with the community</h2>
