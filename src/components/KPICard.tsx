@@ -19,10 +19,10 @@ export default function KPICard({
 }: KPICardProps) {
     const trendColor =
         trend === "up"
-            ? "text-emerald-600 bg-emerald-50"
+            ? "text-[var(--color-light-gray)] bg-[rgba(255,0,0,0.2)]"
             : trend === "down"
-                ? "text-red-600 bg-red-50"
-                : "text-slate-500 bg-slate-50";
+                ? "text-[var(--color-primary)] bg-[rgba(192,0,24,0.28)]"
+                : "text-[rgba(224,226,228,0.8)] bg-[rgba(224,226,228,0.12)]";
 
     const trendIcon =
         trend === "up" ? (
@@ -32,13 +32,13 @@ export default function KPICard({
         ) : null;
 
     return (
-        <div className="glass-card p-6 animate-fade-in">
+        <div className="glass-card p-6 dashboard-card">
             <div className="flex items-start justify-between">
                 <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-                    <p className="text-3xl font-bold text-slate-900">{value}</p>
+                    <p className="text-sm font-medium text-[rgba(224,226,228,0.72)] mb-1">{title}</p>
+                    <p className="text-3xl font-bold text-[var(--color-light-gray)]">{value}</p>
                     {subtitle && (
-                        <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
+                        <p className="text-xs text-[rgba(224,226,228,0.62)] mt-1">{subtitle}</p>
                     )}
                     {trend && trendValue && (
                         <div className={`inline-flex items-center gap-1 mt-3 px-2.5 py-1 rounded-lg text-xs font-semibold ${trendColor}`}>

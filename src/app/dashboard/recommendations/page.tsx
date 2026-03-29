@@ -15,29 +15,29 @@ interface Insight {
 
 const severityStyles: Record<string, { card: string; badge: string; icon: string }> = {
     critical: {
-        card: "border-l-4 border-l-red-500",
-        badge: "bg-red-100 text-red-700",
-        icon: "text-red-500",
+        card: "border-l-4 border-l-[var(--color-primary)]",
+        badge: "bg-[rgba(255,0,0,0.18)] text-[var(--color-primary)]",
+        icon: "text-[var(--color-primary)]",
     },
     high: {
-        card: "border-l-4 border-l-amber-500",
-        badge: "bg-amber-100 text-amber-700",
-        icon: "text-amber-500",
+        card: "border-l-4 border-l-[var(--color-deep-red)]",
+        badge: "bg-[rgba(192,0,24,0.22)] text-[var(--color-primary)]",
+        icon: "text-[var(--color-deep-red)]",
     },
     medium: {
-        card: "border-l-4 border-l-blue-500",
-        badge: "bg-blue-100 text-blue-700",
-        icon: "text-blue-500",
+        card: "border-l-4 border-l-[rgba(224,226,228,0.8)]",
+        badge: "bg-[rgba(224,226,228,0.14)] text-[var(--color-light-gray)]",
+        icon: "text-[var(--color-light-gray)]",
     },
     low: {
-        card: "border-l-4 border-l-emerald-500",
-        badge: "bg-emerald-100 text-emerald-700",
-        icon: "text-emerald-500",
+        card: "border-l-4 border-l-[rgba(224,226,228,0.6)]",
+        badge: "bg-[rgba(224,226,228,0.12)] text-[var(--color-light-gray)]",
+        icon: "text-[var(--color-light-gray)]",
     },
     info: {
-        card: "border-l-4 border-l-slate-400",
-        badge: "bg-slate-100 text-slate-700",
-        icon: "text-slate-500",
+        card: "border-l-4 border-l-[rgba(224,226,228,0.5)]",
+        badge: "bg-[rgba(224,226,228,0.1)] text-[rgba(224,226,228,0.82)]",
+        icon: "text-[rgba(224,226,228,0.82)]",
     },
 };
 
@@ -77,43 +77,43 @@ export default function RecommendationsPage() {
             <Navbar title="AI Recommendations" subtitle="Intelligent insights and actionable suggestions" />
             <div className="p-6 lg:p-8 space-y-6">
                 {/* Summary */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="glass-card p-5">
-                        <p className="text-sm text-slate-500">Total Insights</p>
-                        <p className="text-3xl font-bold text-slate-900 mt-1">{insights.length}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 scroll-section">
+                    <div className="glass-card p-5 dashboard-card">
+                        <p className="text-sm text-[rgba(224,226,228,0.72)]">Total Insights</p>
+                        <p className="text-3xl font-bold text-[var(--color-light-gray)] mt-1">{insights.length}</p>
                     </div>
-                    <div className="glass-card p-5">
-                        <p className="text-sm text-slate-500">Critical Actions</p>
-                        <p className="text-3xl font-bold text-red-600 mt-1">{criticalCount}</p>
+                    <div className="glass-card p-5 dashboard-card">
+                        <p className="text-sm text-[rgba(224,226,228,0.72)]">Critical Actions</p>
+                        <p className="text-3xl font-bold text-[var(--color-primary)] mt-1">{criticalCount}</p>
                     </div>
-                    <div className="glass-card p-5">
-                        <p className="text-sm text-slate-500">High Priority</p>
-                        <p className="text-3xl font-bold text-amber-600 mt-1">{highCount}</p>
+                    <div className="glass-card p-5 dashboard-card">
+                        <p className="text-sm text-[rgba(224,226,228,0.72)]">High Priority</p>
+                        <p className="text-3xl font-bold text-[var(--color-deep-red)] mt-1">{highCount}</p>
                     </div>
                 </div>
 
                 {/* Insights list */}
-                <div className="space-y-4">
+                <div className="space-y-4 scroll-section">
                     {insights.map((insight, i) => {
                         const style = severityStyles[insight.severity] || severityStyles.info;
                         const icon = typeIcons[insight.type] || typeIcons.model_performance;
                         return (
-                            <div key={i} className={`glass-card p-6 ${style.card} animate-fade-in`}>
+                            <div key={i} className={`glass-card p-6 ${style.card} dashboard-card`}>
                                 <div className="flex items-start gap-4">
                                     <div className={`shrink-0 mt-0.5 ${style.icon}`}>{icon}</div>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                            <h3 className="text-base font-bold text-slate-900">{insight.title}</h3>
+                                            <h3 className="text-base font-bold text-[var(--color-light-gray)]">{insight.title}</h3>
                                             <span className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold capitalize ${style.badge}`}>
                                                 {insight.severity}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-slate-600 leading-relaxed mb-3">{insight.message}</p>
-                                        <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100">
-                                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                        <p className="text-sm text-[rgba(224,226,228,0.78)] leading-relaxed mb-3">{insight.message}</p>
+                                        <div className="bg-[rgba(29,30,39,0.62)] rounded-xl p-3.5 border border-[rgba(224,226,228,0.14)]">
+                                            <p className="text-xs font-semibold text-[rgba(224,226,228,0.72)] uppercase tracking-wider mb-1">
                                                 Recommended Action
                                             </p>
-                                            <p className="text-sm text-slate-700 font-medium">{insight.action}</p>
+                                            <p className="text-sm text-[var(--color-light-gray)] font-medium">{insight.action}</p>
                                         </div>
                                     </div>
                                 </div>

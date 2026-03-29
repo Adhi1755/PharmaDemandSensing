@@ -27,9 +27,9 @@ interface Feature {
 }
 
 const MODEL_COLORS: Record<string, string> = {
-    TFT: "#4f46e5",
-    LSTM: "#06b6d4",
-    ARIMA: "#f59e0b",
+    TFT: "#FF0000",
+    LSTM: "#C00018",
+    ARIMA: "#E0E2E4",
 };
 
 export default function ModelPage() {
@@ -60,47 +60,47 @@ export default function ModelPage() {
             <Navbar title="Model Insights" subtitle="TFT vs LSTM vs ARIMA performance comparison" />
             <div className="p-6 lg:p-8 space-y-6">
                 {/* Model Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 scroll-section">
                     {models.map((model) => (
                         <div
                             key={model.shortName}
-                            className={`glass-card p-6 border-t-4`}
+                            className={`glass-card p-6 border-t-4 dashboard-card`}
                             style={{ borderTopColor: MODEL_COLORS[model.shortName] }}
                         >
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-slate-900">{model.shortName}</h3>
+                                <h3 className="text-lg font-bold text-[var(--color-light-gray)]">{model.shortName}</h3>
                                 {model.shortName === "TFT" && (
-                                    <span className="px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg">Best</span>
+                                    <span className="px-3 py-1 bg-[rgba(255,0,0,0.2)] text-[var(--color-primary)] text-xs font-semibold rounded-lg">Best</span>
                                 )}
                             </div>
-                            <p className="text-xs text-slate-500 mb-4 leading-relaxed">{model.description}</p>
+                            <p className="text-xs text-[rgba(224,226,228,0.72)] mb-4 leading-relaxed">{model.description}</p>
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-sm text-slate-600">Accuracy</span>
-                                    <span className="text-sm font-bold text-slate-900">{model.accuracy}%</span>
+                                    <span className="text-sm text-[rgba(224,226,228,0.8)]">Accuracy</span>
+                                    <span className="text-sm font-bold text-[var(--color-light-gray)]">{model.accuracy}%</span>
                                 </div>
-                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="w-full h-2 bg-[rgba(224,226,228,0.16)] rounded-full overflow-hidden">
                                     <div
                                         className="h-full rounded-full transition-all duration-500"
                                         style={{ width: `${model.accuracy}%`, backgroundColor: MODEL_COLORS[model.shortName] }}
                                     ></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3 mt-3">
-                                    <div className="bg-slate-50 rounded-lg p-3 text-center">
-                                        <p className="text-xs text-slate-500">MAE</p>
-                                        <p className="text-base font-bold text-slate-900">{model.mae}</p>
+                                    <div className="bg-[rgba(29,30,39,0.62)] rounded-lg p-3 text-center">
+                                        <p className="text-xs text-[rgba(224,226,228,0.72)]">MAE</p>
+                                        <p className="text-base font-bold text-[var(--color-light-gray)]">{model.mae}</p>
                                     </div>
-                                    <div className="bg-slate-50 rounded-lg p-3 text-center">
-                                        <p className="text-xs text-slate-500">RMSE</p>
-                                        <p className="text-base font-bold text-slate-900">{model.rmse}</p>
+                                    <div className="bg-[rgba(29,30,39,0.62)] rounded-lg p-3 text-center">
+                                        <p className="text-xs text-[rgba(224,226,228,0.72)]">RMSE</p>
+                                        <p className="text-base font-bold text-[var(--color-light-gray)]">{model.rmse}</p>
                                     </div>
-                                    <div className="bg-slate-50 rounded-lg p-3 text-center">
-                                        <p className="text-xs text-slate-500">MAPE</p>
-                                        <p className="text-base font-bold text-slate-900">{model.mape}%</p>
+                                    <div className="bg-[rgba(29,30,39,0.62)] rounded-lg p-3 text-center">
+                                        <p className="text-xs text-[rgba(224,226,228,0.72)]">MAPE</p>
+                                        <p className="text-base font-bold text-[var(--color-light-gray)]">{model.mape}%</p>
                                     </div>
-                                    <div className="bg-slate-50 rounded-lg p-3 text-center">
-                                        <p className="text-xs text-slate-500">Train Time</p>
-                                        <p className="text-base font-bold text-slate-900">{model.trainingTime}</p>
+                                    <div className="bg-[rgba(29,30,39,0.62)] rounded-lg p-3 text-center">
+                                        <p className="text-xs text-[rgba(224,226,228,0.72)]">Train Time</p>
+                                        <p className="text-base font-bold text-[var(--color-light-gray)]">{model.trainingTime}</p>
                                     </div>
                                 </div>
                             </div>
@@ -109,35 +109,35 @@ export default function ModelPage() {
                 </div>
 
                 {/* Radar Chart */}
-                <div className="glass-card p-6">
-                    <h2 className="text-lg font-bold text-slate-900 mb-1">Model Comparison</h2>
-                    <p className="text-sm text-slate-500 mb-6">Normalized performance across key metrics (higher is better)</p>
+                <div className="glass-card p-6 dashboard-card chart-section">
+                    <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">Model Comparison</h2>
+                    <p className="text-sm text-[rgba(224,226,228,0.72)] mb-6">Normalized performance across key metrics (higher is better)</p>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
                             <RadarChart data={comparisonData} cx="50%" cy="50%" outerRadius="70%">
-                                <PolarGrid stroke="#e2e8f0" />
-                                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 12, fill: "#64748b" }} />
-                                <PolarRadiusAxis tick={{ fontSize: 10, fill: "#94a3b8" }} />
-                                <Radar name="TFT" dataKey="TFT" stroke="#4f46e5" fill="#4f46e5" fillOpacity={0.15} strokeWidth={2} />
-                                <Radar name="LSTM" dataKey="LSTM" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.1} strokeWidth={2} />
-                                <Radar name="ARIMA" dataKey="ARIMA" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.08} strokeWidth={2} />
-                                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 13 }} />
+                                <PolarGrid stroke="rgba(224,226,228,0.16)" />
+                                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 12, fill: "#E0E2E4" }} />
+                                <PolarRadiusAxis tick={{ fontSize: 10, fill: "#E0E2E4" }} />
+                                <Radar name="TFT" dataKey="TFT" stroke="#FF0000" fill="#FF0000" fillOpacity={0.15} strokeWidth={2} />
+                                <Radar name="LSTM" dataKey="LSTM" stroke="#C00018" fill="#C00018" fillOpacity={0.12} strokeWidth={2} />
+                                <Radar name="ARIMA" dataKey="ARIMA" stroke="#E0E2E4" fill="#E0E2E4" fillOpacity={0.08} strokeWidth={2} />
+                                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#4B4E53", color: "#E0E2E4" }} />
                             </RadarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
                 {/* Feature Importance */}
-                <div className="glass-card p-6">
-                    <h2 className="text-lg font-bold text-slate-900 mb-1">Feature Importance</h2>
-                    <p className="text-sm text-slate-500 mb-6">Which features influence demand predictions the most (TFT model)</p>
+                <div className="glass-card p-6 dashboard-card chart-section">
+                    <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">Feature Importance</h2>
+                    <p className="text-sm text-[rgba(224,226,228,0.72)] mb-6">Which features influence demand predictions the most (TFT model)</p>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={features} layout="vertical" margin={{ left: 150 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(224,226,228,0.16)" />
                                 <XAxis
                                     type="number"
-                                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                                    tick={{ fontSize: 11, fill: "#E0E2E4" }}
                                     axisLine={false}
                                     tickLine={false}
                                     domain={[0, 0.3]}
@@ -145,18 +145,18 @@ export default function ModelPage() {
                                 <YAxis
                                     dataKey="feature"
                                     type="category"
-                                    tick={{ fontSize: 12, fill: "#64748b" }}
+                                    tick={{ fontSize: 12, fill: "#E0E2E4" }}
                                     axisLine={false}
                                     tickLine={false}
                                     width={140}
                                 />
                                 <Tooltip
-                                    contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 13 }}
+                                    contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#4B4E53", color: "#E0E2E4" }}
                                     formatter={(v: number) => [(v * 100).toFixed(1) + "%", "Importance"]}
                                 />
                                 <Bar dataKey="importance" radius={[0, 8, 8, 0]} name="Importance">
                                     {features.map((_, i) => (
-                                        <Cell key={i} fill={i < 3 ? "#4f46e5" : i < 6 ? "#818cf8" : "#c7d2fe"} />
+                                        <Cell key={i} fill={i < 3 ? "#FF0000" : i < 6 ? "#C00018" : "#E0E2E4"} />
                                     ))}
                                 </Bar>
                             </BarChart>

@@ -29,9 +29,9 @@ export default function InventoryPage() {
         filter === "all" ? inventory : inventory.filter((i) => i.status.toLowerCase() === filter);
 
     const statusStyle: Record<string, string> = {
-        Critical: "bg-red-100 text-red-700",
-        Low: "bg-amber-100 text-amber-700",
-        Adequate: "bg-emerald-100 text-emerald-700",
+        Critical: "bg-[rgba(255,0,0,0.18)] text-[var(--color-primary)]",
+        Low: "bg-[rgba(192,0,24,0.2)] text-[var(--color-primary)]",
+        Adequate: "bg-[rgba(224,226,228,0.14)] text-[var(--color-light-gray)]",
     };
 
     const criticalCount = inventory.filter((i) => i.status === "Critical").length;
@@ -42,30 +42,30 @@ export default function InventoryPage() {
             <Navbar title="Inventory Optimization" subtitle="Stock levels and reorder suggestions" />
             <div className="p-6 lg:p-8 space-y-6">
                 {/* Summary cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="glass-card p-5">
-                        <p className="text-sm text-slate-500">Total SKUs</p>
-                        <p className="text-3xl font-bold text-slate-900 mt-1">{inventory.length}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 scroll-section">
+                    <div className="glass-card p-5 dashboard-card">
+                        <p className="text-sm text-[rgba(224,226,228,0.72)]">Total SKUs</p>
+                        <p className="text-3xl font-bold text-[var(--color-light-gray)] mt-1">{inventory.length}</p>
                     </div>
-                    <div className="glass-card p-5">
-                        <p className="text-sm text-slate-500">Critical Stock Items</p>
-                        <p className="text-3xl font-bold text-red-600 mt-1">{criticalCount}</p>
+                    <div className="glass-card p-5 dashboard-card">
+                        <p className="text-sm text-[rgba(224,226,228,0.72)]">Critical Stock Items</p>
+                        <p className="text-3xl font-bold text-[var(--color-primary)] mt-1">{criticalCount}</p>
                     </div>
-                    <div className="glass-card p-5">
-                        <p className="text-sm text-slate-500">Low Stock Items</p>
-                        <p className="text-3xl font-bold text-amber-600 mt-1">{lowCount}</p>
+                    <div className="glass-card p-5 dashboard-card">
+                        <p className="text-sm text-[rgba(224,226,228,0.72)]">Low Stock Items</p>
+                        <p className="text-3xl font-bold text-[var(--color-deep-red)] mt-1">{lowCount}</p>
                     </div>
                 </div>
 
                 {/* Filter */}
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap scroll-section">
                     {["all", "critical", "low", "adequate"].map((f) => (
                         <button
                             key={f}
                             onClick={() => setFilter(f)}
-                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors capitalize ${filter === f
-                                    ? "bg-indigo-600 text-white"
-                                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors capitalize gsap-btn ${filter === f
+                                    ? "bg-[var(--color-deep-red)] text-[var(--color-light-gray)]"
+                                    : "bg-[rgba(75,78,83,0.72)] text-[rgba(224,226,228,0.78)] border border-[rgba(224,226,228,0.14)] hover:bg-[rgba(255,0,0,0.16)]"
                                 }`}
                         >
                             {f === "all" ? "All Items" : f}
@@ -74,40 +74,40 @@ export default function InventoryPage() {
                 </div>
 
                 {/* Table */}
-                <div className="glass-card overflow-hidden">
+                <div className="glass-card overflow-hidden dashboard-card chart-section">
                     {loading ? (
                         <LoadingSpinner text="Loading inventory..." />
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
-                                    <tr className="bg-slate-50/80 border-b border-slate-200">
-                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Drug Name</th>
-                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Category</th>
-                                        <th className="text-right px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Current Stock</th>
-                                        <th className="text-right px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Predicted Demand</th>
-                                        <th className="text-right px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Safety Stock</th>
-                                        <th className="text-right px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Reorder Qty</th>
-                                        <th className="text-center px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                    <tr className="bg-[rgba(29,30,39,0.72)] border-b border-[rgba(224,226,228,0.14)]">
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-[rgba(224,226,228,0.72)] uppercase tracking-wider">Drug Name</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-[rgba(224,226,228,0.72)] uppercase tracking-wider">Category</th>
+                                        <th className="text-right px-6 py-4 text-xs font-semibold text-[rgba(224,226,228,0.72)] uppercase tracking-wider">Current Stock</th>
+                                        <th className="text-right px-6 py-4 text-xs font-semibold text-[rgba(224,226,228,0.72)] uppercase tracking-wider">Predicted Demand</th>
+                                        <th className="text-right px-6 py-4 text-xs font-semibold text-[rgba(224,226,228,0.72)] uppercase tracking-wider">Safety Stock</th>
+                                        <th className="text-right px-6 py-4 text-xs font-semibold text-[rgba(224,226,228,0.72)] uppercase tracking-wider">Reorder Qty</th>
+                                        <th className="text-center px-6 py-4 text-xs font-semibold text-[rgba(224,226,228,0.72)] uppercase tracking-wider">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100">
+                                <tbody className="divide-y divide-[rgba(224,226,228,0.1)]">
                                     {filtered.map((item) => (
                                         <tr
                                             key={item.id}
-                                            className={`hover:bg-slate-50/50 transition-colors ${item.status === "Critical" ? "bg-red-50/30" : ""
+                                            className={`hover:bg-[rgba(255,0,0,0.08)] transition-colors ${item.status === "Critical" ? "bg-[rgba(255,0,0,0.08)]" : ""
                                                 }`}
                                         >
-                                            <td className="px-6 py-4 text-sm font-semibold text-slate-900">{item.name}</td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">{item.category}</td>
-                                            <td className="px-6 py-4 text-sm text-right font-medium text-slate-900">{item.currentStock}</td>
-                                            <td className="px-6 py-4 text-sm text-right font-medium text-slate-900">{item.predictedDemand}</td>
-                                            <td className="px-6 py-4 text-sm text-right text-slate-600">{item.safetyStock}</td>
-                                            <td className="px-6 py-4 text-sm text-right font-bold text-indigo-600">
+                                            <td className="px-6 py-4 text-sm font-semibold text-[var(--color-light-gray)]">{item.name}</td>
+                                            <td className="px-6 py-4 text-sm text-[rgba(224,226,228,0.8)]">{item.category}</td>
+                                            <td className="px-6 py-4 text-sm text-right font-medium text-[var(--color-light-gray)]">{item.currentStock}</td>
+                                            <td className="px-6 py-4 text-sm text-right font-medium text-[var(--color-light-gray)]">{item.predictedDemand}</td>
+                                            <td className="px-6 py-4 text-sm text-right text-[rgba(224,226,228,0.8)]">{item.safetyStock}</td>
+                                            <td className="px-6 py-4 text-sm text-right font-bold text-[var(--color-primary)]">
                                                 {item.suggestedReorder > 0 ? `+${item.suggestedReorder}` : "-"}
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${statusStyle[item.status] || "bg-slate-100 text-slate-600"}`}>
+                                                <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${statusStyle[item.status] || "bg-[rgba(224,226,228,0.12)] text-[rgba(224,226,228,0.8)]"}`}>
                                                     {item.status}
                                                 </span>
                                             </td>
