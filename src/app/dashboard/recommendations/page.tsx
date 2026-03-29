@@ -75,41 +75,42 @@ export default function RecommendationsPage() {
     return (
         <>
             <Navbar title="AI Recommendations" subtitle="Intelligent insights and actionable suggestions" />
-            <div className="p-6 lg:p-8 space-y-6">
+            <div className="p-0">
+                <div className="border border-[rgba(255,255,255,0.08)] bg-[#1D1E27]">
                 {/* Summary */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 scroll-section">
-                    <div className="glass-card p-5 dashboard-card">
+                <section className="grid grid-cols-1 sm:grid-cols-3 gap-0 scroll-section border-b border-[rgba(255,255,255,0.08)]">
+                    <div className="p-5 border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
                         <p className="text-sm text-[rgba(224,226,228,0.72)]">Total Insights</p>
                         <p className="text-3xl font-bold text-[var(--color-light-gray)] mt-1">{insights.length}</p>
                     </div>
-                    <div className="glass-card p-5 dashboard-card">
+                    <div className="p-5 border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
                         <p className="text-sm text-[rgba(224,226,228,0.72)]">Critical Actions</p>
                         <p className="text-3xl font-bold text-[var(--color-primary)] mt-1">{criticalCount}</p>
                     </div>
-                    <div className="glass-card p-5 dashboard-card">
+                    <div className="p-5 dashboard-card">
                         <p className="text-sm text-[rgba(224,226,228,0.72)]">High Priority</p>
                         <p className="text-3xl font-bold text-[var(--color-deep-red)] mt-1">{highCount}</p>
                     </div>
-                </div>
+                </section>
 
                 {/* Insights list */}
-                <div className="space-y-4 scroll-section">
+                <section className="grid grid-cols-1 gap-0 scroll-section">
                     {insights.map((insight, i) => {
                         const style = severityStyles[insight.severity] || severityStyles.info;
                         const icon = typeIcons[insight.type] || typeIcons.model_performance;
                         return (
-                            <div key={i} className={`glass-card p-6 ${style.card} dashboard-card`}>
+                            <div key={i} className={`p-6 border-b border-[rgba(255,255,255,0.08)] ${style.card} dashboard-card`}>
                                 <div className="flex items-start gap-4">
                                     <div className={`shrink-0 mt-0.5 ${style.icon}`}>{icon}</div>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2 flex-wrap">
                                             <h3 className="text-base font-bold text-[var(--color-light-gray)]">{insight.title}</h3>
-                                            <span className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold capitalize ${style.badge}`}>
+                                            <span className={`px-2.5 py-0.5 text-xs font-semibold capitalize ${style.badge}`}>
                                                 {insight.severity}
                                             </span>
                                         </div>
                                         <p className="text-sm text-[rgba(224,226,228,0.78)] leading-relaxed mb-3">{insight.message}</p>
-                                        <div className="bg-[rgba(29,30,39,0.62)] rounded-xl p-3.5 border border-[rgba(224,226,228,0.14)]">
+                                        <div className="bg-[rgba(29,30,39,0.62)] p-3.5 border border-[rgba(224,226,228,0.14)]">
                                             <p className="text-xs font-semibold text-[rgba(224,226,228,0.72)] uppercase tracking-wider mb-1">
                                                 Recommended Action
                                             </p>
@@ -120,6 +121,7 @@ export default function RecommendationsPage() {
                             </div>
                         );
                     })}
+                </section>
                 </div>
             </div>
         </>

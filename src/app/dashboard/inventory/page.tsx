@@ -40,41 +40,42 @@ export default function InventoryPage() {
     return (
         <>
             <Navbar title="Inventory Optimization" subtitle="Stock levels and reorder suggestions" />
-            <div className="p-6 lg:p-8 space-y-6">
+            <div className="p-0">
+                <div className="border border-[rgba(255,255,255,0.08)] bg-[#1D1E27]">
                 {/* Summary cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 scroll-section">
-                    <div className="glass-card p-5 dashboard-card">
+                <section className="grid grid-cols-1 sm:grid-cols-3 gap-0 scroll-section border-b border-[rgba(255,255,255,0.08)]">
+                    <div className="p-5 border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
                         <p className="text-sm text-[rgba(224,226,228,0.72)]">Total SKUs</p>
                         <p className="text-3xl font-bold text-[var(--color-light-gray)] mt-1">{inventory.length}</p>
                     </div>
-                    <div className="glass-card p-5 dashboard-card">
+                    <div className="p-5 border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
                         <p className="text-sm text-[rgba(224,226,228,0.72)]">Critical Stock Items</p>
                         <p className="text-3xl font-bold text-[var(--color-primary)] mt-1">{criticalCount}</p>
                     </div>
-                    <div className="glass-card p-5 dashboard-card">
+                    <div className="p-5 dashboard-card">
                         <p className="text-sm text-[rgba(224,226,228,0.72)]">Low Stock Items</p>
                         <p className="text-3xl font-bold text-[var(--color-deep-red)] mt-1">{lowCount}</p>
                     </div>
-                </div>
+                </section>
 
                 {/* Filter */}
-                <div className="flex gap-2 flex-wrap scroll-section">
+                <section className="flex gap-0 flex-wrap scroll-section border-b border-[rgba(255,255,255,0.08)]">
                     {["all", "critical", "low", "adequate"].map((f) => (
                         <button
                             key={f}
                             onClick={() => setFilter(f)}
-                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors capitalize gsap-btn ${filter === f
+                            className={`px-4 py-2 border-r border-[rgba(255,255,255,0.08)] text-sm font-semibold transition-colors capitalize gsap-btn ${filter === f
                                     ? "bg-[var(--color-deep-red)] text-[var(--color-light-gray)]"
-                                    : "bg-[rgba(0,0,0,0.72)] text-[rgba(224,226,228,0.78)] border border-[rgba(224,226,228,0.14)] hover:bg-[rgba(255,0,0,0.16)]"
+                                    : "bg-[rgba(0,0,0,0.72)] text-[rgba(224,226,228,0.78)] hover:bg-[rgba(255,0,0,0.16)]"
                                 }`}
                         >
                             {f === "all" ? "All Items" : f}
                         </button>
                     ))}
-                </div>
+                </section>
 
                 {/* Table */}
-                <div className="glass-card overflow-hidden dashboard-card chart-section">
+                <section className="overflow-x-auto dashboard-card chart-section">
                     {loading ? (
                         <LoadingSpinner text="Loading inventory..." />
                     ) : (
@@ -107,7 +108,7 @@ export default function InventoryPage() {
                                                 {item.suggestedReorder > 0 ? `+${item.suggestedReorder}` : "-"}
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${statusStyle[item.status] || "bg-[rgba(224,226,228,0.12)] text-[rgba(224,226,228,0.8)]"}`}>
+                                                <span className={`inline-block px-3 py-1 text-xs font-semibold ${statusStyle[item.status] || "bg-[rgba(224,226,228,0.12)] text-[rgba(224,226,228,0.8)]"}`}>
                                                     {item.status}
                                                 </span>
                                             </td>
@@ -117,6 +118,7 @@ export default function InventoryPage() {
                             </table>
                         </div>
                     )}
+                </section>
                 </div>
             </div>
         </>

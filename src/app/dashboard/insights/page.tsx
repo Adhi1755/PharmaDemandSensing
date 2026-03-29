@@ -48,11 +48,12 @@ export default function InsightsPage() {
     return (
         <>
             <Navbar title="Location Insights" subtitle="Regional demand variation analysis" />
-            <div className="p-6 lg:p-8 space-y-6">
+            <div className="p-0">
+                <div className="border border-[rgba(255,255,255,0.08)] bg-[#1D1E27]">
                 {/* Region Filter */}
-                <div className="glass-card p-6 dashboard-card scroll-section">
+                <section className="p-6 border-b border-[rgba(255,255,255,0.08)] dashboard-card scroll-section">
                     <label className="block text-sm font-medium text-[rgba(224,226,228,0.86)] mb-2">Filter by Region</label>
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-0 flex-wrap border border-[rgba(255,255,255,0.08)]">
                         {REGIONS.map((r) => (
                             <button
                                 key={r}
@@ -60,23 +61,23 @@ export default function InsightsPage() {
                                     setLoading(true);
                                     setSelectedRegion(r);
                                 }}
-                                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors gsap-btn ${selectedRegion === r
+                                className={`px-4 py-2 border-r border-b border-[rgba(255,255,255,0.08)] text-sm font-semibold transition-colors gsap-btn ${selectedRegion === r
                                         ? "bg-[var(--color-deep-red)] text-[var(--color-light-gray)]"
-                                        : "bg-[rgba(29,30,39,0.6)] text-[rgba(224,226,228,0.78)] border border-[rgba(224,226,228,0.14)] hover:bg-[rgba(255,0,0,0.16)]"
+                                        : "bg-[rgba(29,30,39,0.6)] text-[rgba(224,226,228,0.78)] hover:bg-[rgba(255,0,0,0.16)]"
                                     }`}
                             >
                                 {r}
                             </button>
                         ))}
                     </div>
-                </div>
+                </section>
 
                 {loading ? (
                     <LoadingSpinner text="Loading location data..." />
                 ) : (
                     <>
                         {/* Regional Demand Bar Chart */}
-                        <div className="glass-card p-6 dashboard-card chart-section">
+                        <section className="p-6 border-b border-[rgba(255,255,255,0.08)] dashboard-card chart-section">
                             <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">
                                 {selectedRegion === "All Regions" ? "Demand by Region" : `${selectedRegion} - District Demand`}
                             </h2>
@@ -104,7 +105,7 @@ export default function InsightsPage() {
                                             <Tooltip
                                                 contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#000000", color: "#E0E2E4" }}
                                             />
-                                            <Bar dataKey="demand" radius={[8, 8, 0, 0]} name="Total Demand">
+                                            <Bar dataKey="demand" radius={[0, 0, 0, 0]} name="Total Demand">
                                                 {regionChartData.map((_, i) => (
                                                     <Cell key={i} fill={REGION_COLORS[i % REGION_COLORS.length]} />
                                                 ))}
@@ -127,17 +128,17 @@ export default function InsightsPage() {
                                             <Tooltip
                                                 contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#000000", color: "#E0E2E4" }}
                                             />
-                                            <Bar dataKey="demand" fill="#C00018" radius={[8, 8, 0, 0]} name="Demand" />
+                                            <Bar dataKey="demand" fill="#C00018" radius={[0, 0, 0, 0]} name="Demand" />
                                         </BarChart>
                                     )}
                                 </ResponsiveContainer>
                             </div>
-                        </div>
+                        </section>
 
                         {/* District-level detail cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 scroll-section">
+                        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-0 scroll-section">
                             {data.map((d) => (
-                                <div key={`${d.region}-${d.district}`} className="glass-card p-5 dashboard-card">
+                                <div key={`${d.region}-${d.district}`} className="p-5 border-r border-b border-[rgba(255,255,255,0.08)] dashboard-card">
                                     <div className="flex items-center justify-between mb-3">
                                         <div>
                                             <p className="text-sm font-bold text-[var(--color-light-gray)]">{d.district}</p>
@@ -150,9 +151,9 @@ export default function InsightsPage() {
                                             <div key={drug.drug} className="flex items-center justify-between">
                                                 <span className="text-xs text-[rgba(224,226,228,0.8)]">{drug.drug}</span>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-20 h-1.5 bg-[rgba(224,226,228,0.16)] rounded-full overflow-hidden">
+                                                    <div className="w-20 h-1.5 bg-[rgba(224,226,228,0.16)] overflow-hidden">
                                                         <div
-                                                            className="h-full bg-[var(--color-primary)] rounded-full"
+                                                            className="h-full bg-[var(--color-primary)]"
                                                             style={{ width: `${(drug.demand / d.totalDemand) * 100}%` }}
                                                         ></div>
                                                     </div>
@@ -163,9 +164,10 @@ export default function InsightsPage() {
                                     </div>
                                 </div>
                             ))}
-                        </div>
+                        </section>
                     </>
                 )}
+                </div>
             </div>
         </>
     );

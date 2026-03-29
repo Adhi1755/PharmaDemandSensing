@@ -42,43 +42,44 @@ export default function DemandPage() {
     return (
         <>
             <Navbar title="Intermittent Demand Patterns" subtitle="Visualizing sparse demand with zero-demand gaps and spikes" />
-            <div className="p-6 lg:p-8 space-y-6">
-                {/* Drug Selector */}
-                <div className="flex gap-3 flex-wrap scroll-section">
+            <div className="p-0">
+                <div className="scroll-section border border-[rgba(255,255,255,0.08)] bg-[#1D1E27]">
+                    {/* Drug Selector */}
+                    <div className="flex gap-0 flex-wrap border-b border-[rgba(255,255,255,0.08)]">
                     {data.map((d, i) => (
                         <button
                             key={d.drug}
                             onClick={() => setSelectedDrug(i)}
-                            className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all gsap-btn ${selectedDrug === i
-                                    ? "bg-[var(--color-deep-red)] text-[var(--color-light-gray)] shadow-md"
-                                    : "bg-[rgba(0,0,0,0.72)] text-[rgba(224,226,228,0.78)] border border-[rgba(224,226,228,0.14)] hover:bg-[rgba(255,0,0,0.16)]"
+                            className={`px-4 py-3 border-r border-[rgba(255,255,255,0.08)] text-sm font-semibold transition-colors gsap-btn ${selectedDrug === i
+                                    ? "bg-[var(--color-deep-red)] text-[var(--color-light-gray)]"
+                                    : "bg-[rgba(13,15,18,0.72)] text-[rgba(224,226,228,0.78)] hover:bg-[rgba(255,0,0,0.16)]"
                                 }`}
                         >
                             {d.drug}
                         </button>
                     ))}
-                </div>
+                    </div>
 
                 {current && (
                     <>
                         {/* Stats */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 scroll-section">
-                            <div className="glass-card p-5 text-center dashboard-card">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 scroll-section border-b border-[rgba(255,255,255,0.08)]">
+                            <div className="p-5 text-center border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
                                 <p className="text-sm text-[rgba(224,226,228,0.72)]">Intermittency Rate</p>
                                 <p className="text-2xl font-bold text-[var(--color-primary)] mt-1">{current.intermittencyRate}%</p>
                                 <p className="text-xs text-[rgba(224,226,228,0.62)]">of days with zero demand</p>
                             </div>
-                            <div className="glass-card p-5 text-center dashboard-card">
+                            <div className="p-5 text-center border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
                                 <p className="text-sm text-[rgba(224,226,228,0.72)]">Zero-Demand Days</p>
                                 <p className="text-2xl font-bold text-[var(--color-light-gray)] mt-1">{current.zeroDays} / {current.totalDays}</p>
                                 <p className="text-xs text-[rgba(224,226,228,0.62)]">days observed</p>
                             </div>
-                            <div className="glass-card p-5 text-center dashboard-card">
+                            <div className="p-5 text-center border-r border-[rgba(255,255,255,0.08)] dashboard-card">
                                 <p className="text-sm text-[rgba(224,226,228,0.72)]">Demand Spikes</p>
                                 <p className="text-2xl font-bold text-[var(--color-deep-red)] mt-1">{current.spikeCount}</p>
                                 <p className="text-xs text-[rgba(224,226,228,0.62)]">above threshold</p>
                             </div>
-                            <div className="glass-card p-5 text-center dashboard-card">
+                            <div className="p-5 text-center dashboard-card">
                                 <p className="text-sm text-[rgba(224,226,228,0.72)]">Avg Non-Zero Demand</p>
                                 <p className="text-2xl font-bold text-[var(--color-light-gray)] mt-1">{avgDemand}</p>
                                 <p className="text-xs text-[rgba(224,226,228,0.62)]">units/day</p>
@@ -86,7 +87,7 @@ export default function DemandPage() {
                         </div>
 
                         {/* Demand Pattern Chart */}
-                        <div className="glass-card p-6 dashboard-card chart-section">
+                        <div className="p-6 dashboard-card chart-section">
                             <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">
                                 {current.drug} - Demand Pattern
                             </h2>
@@ -127,7 +128,7 @@ export default function DemandPage() {
                                             strokeDasharray="3 3"
                                             label={{ value: "Avg", position: "right", fill: "#E0E2E4", fontSize: 11 }}
                                         />
-                                        <Bar dataKey="demand" name="Demand" radius={[3, 3, 0, 0]}>
+                                        <Bar dataKey="demand" name="Demand" radius={[0, 0, 0, 0]}>
                                             {current.history.map((h, i) => (
                                                 <Cell
                                                     key={i}
@@ -146,21 +147,22 @@ export default function DemandPage() {
                             </div>
                             <div className="flex items-center gap-6 mt-4">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-sm bg-[var(--color-deep-red)]"></div>
+                                    <div className="w-3 h-3 bg-[var(--color-deep-red)]"></div>
                                     <span className="text-xs text-[rgba(224,226,228,0.8)]">Normal demand</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-sm bg-[var(--color-primary)]"></div>
+                                    <div className="w-3 h-3 bg-[var(--color-primary)]"></div>
                                     <span className="text-xs text-[rgba(224,226,228,0.8)]">Demand spike</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-sm bg-[var(--color-dark-gray)]"></div>
+                                    <div className="w-3 h-3 bg-[var(--color-dark-gray)]"></div>
                                     <span className="text-xs text-[rgba(224,226,228,0.8)]">Zero demand</span>
                                 </div>
                             </div>
                         </div>
                     </>
                 )}
+                </div>
             </div>
         </>
     );

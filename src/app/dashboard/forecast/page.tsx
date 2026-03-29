@@ -61,50 +61,51 @@ export default function ForecastPage() {
     return (
         <>
             <Navbar title="Demand Forecast" subtitle="Historical and predicted demand analysis" />
-            <div className="p-6 lg:p-8 space-y-6">
-                {/* Controls */}
-                <div className="glass-card p-6 dashboard-card scroll-section">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="flex-1">
-                            <label className="block text-sm font-medium text-[rgba(224,226,228,0.86)] mb-1.5">Select Drug</label>
-                            <select
-                                value={selectedDrug}
-                                onChange={(e) => {
-                                    setLoading(true);
-                                    setSelectedDrug(e.target.value);
-                                }}
-                                className="input-field"
-                            >
-                                {drugs.map((d) => (
-                                    <option key={d.id} value={d.name}>{d.name} ({d.category})</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="w-full sm:w-48">
-                            <label className="block text-sm font-medium text-[rgba(224,226,228,0.86)] mb-1.5">Forecast Horizon</label>
-                            <div className="flex rounded-xl overflow-hidden border border-[rgba(224,226,228,0.16)]">
-                                {[7, 30].map((h) => (
-                                    <button
-                                        key={h}
-                                        onClick={() => {
-                                            setLoading(true);
-                                            setHorizon(h);
-                                        }}
-                                        className={`flex-1 py-2.5 text-sm font-semibold transition-colors gsap-btn ${horizon === h
-                                                ? "bg-[var(--color-deep-red)] text-[var(--color-light-gray)]"
-                                                : "bg-[rgba(29,30,39,0.6)] text-[rgba(224,226,228,0.78)] hover:bg-[rgba(255,0,0,0.16)]"
-                                            }`}
-                                    >
-                                        {h} Days
-                                    </button>
-                                ))}
+            <div className="p-0">
+                <div className="scroll-section border border-[rgba(255,255,255,0.08)] bg-[#1D1E27]">
+                    {/* Controls */}
+                    <section className="p-6 border-b border-[rgba(255,255,255,0.08)]">
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-0 border border-[rgba(255,255,255,0.08)]">
+                            <div className="sm:col-span-9 p-4 border-b sm:border-b-0 sm:border-r border-[rgba(255,255,255,0.08)]">
+                                <label className="block text-sm font-medium text-[rgba(224,226,228,0.86)] mb-1.5">Select Drug</label>
+                                <select
+                                    value={selectedDrug}
+                                    onChange={(e) => {
+                                        setLoading(true);
+                                        setSelectedDrug(e.target.value);
+                                    }}
+                                    className="w-full px-3 py-2.5 bg-[rgba(13,15,18,0.72)] border border-[rgba(255,255,255,0.08)] text-[var(--color-light-gray)] text-sm outline-none"
+                                >
+                                    {drugs.map((d) => (
+                                        <option key={d.id} value={d.name}>{d.name} ({d.category})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="sm:col-span-3 p-4">
+                                <label className="block text-sm font-medium text-[rgba(224,226,228,0.86)] mb-1.5">Forecast Horizon</label>
+                                <div className="grid grid-cols-2 gap-0 border border-[rgba(255,255,255,0.08)]">
+                                    {[7, 30].map((h) => (
+                                        <button
+                                            key={h}
+                                            onClick={() => {
+                                                setLoading(true);
+                                                setHorizon(h);
+                                            }}
+                                            className={`py-2.5 text-sm font-semibold border-r last:border-r-0 border-[rgba(255,255,255,0.08)] transition-colors gsap-btn ${horizon === h
+                                                    ? "bg-[var(--color-deep-red)] text-[var(--color-light-gray)]"
+                                                    : "bg-[rgba(13,15,18,0.72)] text-[rgba(224,226,228,0.78)] hover:bg-[rgba(255,0,0,0.16)]"
+                                                }`}
+                                        >
+                                            {h} Days
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </section>
 
                 {/* Chart */}
-                <div className="glass-card p-6 dashboard-card chart-section">
+                <section className="p-6 border-b border-[rgba(255,255,255,0.08)] dashboard-card chart-section">
                     <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">
                         {selectedDrug} - Demand Forecast
                     </h2>
@@ -186,34 +187,35 @@ export default function ForecastPage() {
                             </ResponsiveContainer>
                         </div>
                     )}
-                </div>
+                </section>
 
                 {/* Forecast Summary */}
                 {data && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 scroll-section">
-                        <div className="glass-card p-5 text-center dashboard-card">
+                    <section className="grid grid-cols-1 sm:grid-cols-3 gap-0 scroll-section">
+                        <div className="p-5 text-center border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
                             <p className="text-sm text-[rgba(224,226,228,0.72)] mb-1">Avg Predicted Demand</p>
                             <p className="text-2xl font-bold text-[var(--color-primary)]">
                                 {Math.round(data.forecast.reduce((s, f) => s + f.predicted, 0) / data.forecast.length)}
                             </p>
                             <p className="text-xs text-[rgba(224,226,228,0.62)] mt-1">units/day</p>
                         </div>
-                        <div className="glass-card p-5 text-center dashboard-card">
+                        <div className="p-5 text-center border-r border-b sm:border-b-0 border-[rgba(255,255,255,0.08)] dashboard-card">
                             <p className="text-sm text-[rgba(224,226,228,0.72)] mb-1">Total Forecast</p>
                             <p className="text-2xl font-bold text-[var(--color-deep-red)]">
                                 {data.forecast.reduce((s, f) => s + f.predicted, 0).toLocaleString()}
                             </p>
                             <p className="text-xs text-[rgba(224,226,228,0.62)] mt-1">units over {horizon} days</p>
                         </div>
-                        <div className="glass-card p-5 text-center dashboard-card">
+                        <div className="p-5 text-center dashboard-card">
                             <p className="text-sm text-[rgba(224,226,228,0.72)] mb-1">Forecast Range</p>
                             <p className="text-2xl font-bold text-[var(--color-light-gray)]">
                                 {Math.min(...data.forecast.map(f => f.lower_bound))} - {Math.max(...data.forecast.map(f => f.upper_bound))}
                             </p>
                             <p className="text-xs text-[rgba(224,226,228,0.62)] mt-1">confidence interval</p>
                         </div>
-                    </div>
+                    </section>
                 )}
+                </div>
             </div>
         </>
     );

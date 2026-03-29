@@ -58,19 +58,20 @@ export default function ModelPage() {
     return (
         <>
             <Navbar title="Model Insights" subtitle="TFT vs LSTM vs ARIMA performance comparison" />
-            <div className="p-6 lg:p-8 space-y-6">
+            <div className="p-0">
+                <div className="border border-[rgba(255,255,255,0.08)] bg-[#1D1E27]">
                 {/* Model Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 scroll-section">
+                <section className="grid grid-cols-1 md:grid-cols-3 gap-0 scroll-section border-b border-[rgba(255,255,255,0.08)]">
                     {models.map((model) => (
                         <div
                             key={model.shortName}
-                            className={`glass-card p-6 border-t-4 dashboard-card`}
+                            className={`p-6 border-r border-b md:border-b-0 border-[rgba(255,255,255,0.08)] border-t-4 dashboard-card`}
                             style={{ borderTopColor: MODEL_COLORS[model.shortName] }}
                         >
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-bold text-[var(--color-light-gray)]">{model.shortName}</h3>
                                 {model.shortName === "TFT" && (
-                                    <span className="px-3 py-1 bg-[rgba(255,0,0,0.2)] text-[var(--color-primary)] text-xs font-semibold rounded-lg">Best</span>
+                                    <span className="px-3 py-1 bg-[rgba(255,0,0,0.2)] text-[var(--color-primary)] text-xs font-semibold">Best</span>
                                 )}
                             </div>
                             <p className="text-xs text-[rgba(224,226,228,0.72)] mb-4 leading-relaxed">{model.description}</p>
@@ -79,26 +80,26 @@ export default function ModelPage() {
                                     <span className="text-sm text-[rgba(224,226,228,0.8)]">Accuracy</span>
                                     <span className="text-sm font-bold text-[var(--color-light-gray)]">{model.accuracy}%</span>
                                 </div>
-                                <div className="w-full h-2 bg-[rgba(224,226,228,0.16)] rounded-full overflow-hidden">
+                                <div className="w-full h-2 bg-[rgba(224,226,228,0.16)] overflow-hidden">
                                     <div
-                                        className="h-full rounded-full transition-all duration-500"
+                                        className="h-full transition-all duration-500"
                                         style={{ width: `${model.accuracy}%`, backgroundColor: MODEL_COLORS[model.shortName] }}
                                     ></div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3 mt-3">
-                                    <div className="bg-[rgba(29,30,39,0.62)] rounded-lg p-3 text-center">
+                                <div className="grid grid-cols-2 gap-0 mt-3 border border-[rgba(255,255,255,0.08)]">
+                                    <div className="bg-[rgba(29,30,39,0.62)] p-3 text-center border-r border-b border-[rgba(255,255,255,0.08)]">
                                         <p className="text-xs text-[rgba(224,226,228,0.72)]">MAE</p>
                                         <p className="text-base font-bold text-[var(--color-light-gray)]">{model.mae}</p>
                                     </div>
-                                    <div className="bg-[rgba(29,30,39,0.62)] rounded-lg p-3 text-center">
+                                    <div className="bg-[rgba(29,30,39,0.62)] p-3 text-center border-b border-[rgba(255,255,255,0.08)]">
                                         <p className="text-xs text-[rgba(224,226,228,0.72)]">RMSE</p>
                                         <p className="text-base font-bold text-[var(--color-light-gray)]">{model.rmse}</p>
                                     </div>
-                                    <div className="bg-[rgba(29,30,39,0.62)] rounded-lg p-3 text-center">
+                                    <div className="bg-[rgba(29,30,39,0.62)] p-3 text-center border-r border-[rgba(255,255,255,0.08)]">
                                         <p className="text-xs text-[rgba(224,226,228,0.72)]">MAPE</p>
                                         <p className="text-base font-bold text-[var(--color-light-gray)]">{model.mape}%</p>
                                     </div>
-                                    <div className="bg-[rgba(29,30,39,0.62)] rounded-lg p-3 text-center">
+                                    <div className="bg-[rgba(29,30,39,0.62)] p-3 text-center">
                                         <p className="text-xs text-[rgba(224,226,228,0.72)]">Train Time</p>
                                         <p className="text-base font-bold text-[var(--color-light-gray)]">{model.trainingTime}</p>
                                     </div>
@@ -106,10 +107,10 @@ export default function ModelPage() {
                             </div>
                         </div>
                     ))}
-                </div>
+                </section>
 
                 {/* Radar Chart */}
-                <div className="glass-card p-6 dashboard-card chart-section">
+                <section className="p-6 border-b border-[rgba(255,255,255,0.08)] dashboard-card chart-section">
                     <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">Model Comparison</h2>
                     <p className="text-sm text-[rgba(224,226,228,0.72)] mb-6">Normalized performance across key metrics (higher is better)</p>
                     <div className="h-80">
@@ -125,10 +126,10 @@ export default function ModelPage() {
                             </RadarChart>
                         </ResponsiveContainer>
                     </div>
-                </div>
+                </section>
 
                 {/* Feature Importance */}
-                <div className="glass-card p-6 dashboard-card chart-section">
+                <section className="p-6 dashboard-card chart-section">
                     <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">Feature Importance</h2>
                     <p className="text-sm text-[rgba(224,226,228,0.72)] mb-6">Which features influence demand predictions the most (TFT model)</p>
                     <div className="h-80">
@@ -154,7 +155,7 @@ export default function ModelPage() {
                                     contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#000000", color: "#E0E2E4" }}
                                     formatter={(v: number) => [(v * 100).toFixed(1) + "%", "Importance"]}
                                 />
-                                <Bar dataKey="importance" radius={[0, 8, 8, 0]} name="Importance">
+                                <Bar dataKey="importance" radius={[0, 0, 0, 0]} name="Importance">
                                     {features.map((_, i) => (
                                         <Cell key={i} fill={i < 3 ? "#FF0000" : i < 6 ? "#C00018" : "#E0E2E4"} />
                                     ))}
@@ -162,6 +163,7 @@ export default function ModelPage() {
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
+                </section>
                 </div>
             </div>
         </>
