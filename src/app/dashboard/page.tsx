@@ -138,7 +138,7 @@ export default function DashboardPage() {
                                         contentStyle={{
                                             borderRadius: 12,
                                             border: "1px solid rgba(224,226,228,0.18)",
-                                            backgroundColor: "#4B4E53",
+                                            backgroundColor: "#000000",
                                             fontSize: 13,
                                             color: "#E0E2E4",
                                         }}

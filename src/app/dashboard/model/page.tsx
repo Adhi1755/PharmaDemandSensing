@@ -121,7 +121,7 @@ export default function ModelPage() {
                                 <Radar name="TFT" dataKey="TFT" stroke="#FF0000" fill="#FF0000" fillOpacity={0.15} strokeWidth={2} />
                                 <Radar name="LSTM" dataKey="LSTM" stroke="#C00018" fill="#C00018" fillOpacity={0.12} strokeWidth={2} />
                                 <Radar name="ARIMA" dataKey="ARIMA" stroke="#E0E2E4" fill="#E0E2E4" fillOpacity={0.08} strokeWidth={2} />
-                                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#4B4E53", color: "#E0E2E4" }} />
+                                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#000000", color: "#E0E2E4" }} />
                             </RadarChart>
                         </ResponsiveContainer>
                     </div>
@@ -151,7 +151,7 @@ export default function ModelPage() {
                                     width={140}
                                 />
                                 <Tooltip
-                                    contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#4B4E53", color: "#E0E2E4" }}
+                                    contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#000000", color: "#E0E2E4" }}
                                     formatter={(v: number) => [(v * 100).toFixed(1) + "%", "Importance"]}
                                 />
                                 <Bar dataKey="importance" radius={[0, 8, 8, 0]} name="Importance">

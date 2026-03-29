@@ -5,7 +5,7 @@
     --color-primary: #FF0000;
     --color-deep-red: #C00018;
     --color-navy: #1D1E27;
-    --color-dark-gray: #4B4E53;
+    --color-dark-gray: #000000;
     --color-light-gray: #E0E2E4;
     --soft-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   }
@@ -38,7 +38,7 @@
   }
 
   .glass-card {
-    background: rgba(75, 78, 83, 0.88);
+    background: rgba(0, 0, 0, 0.88);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(224, 226, 228, 0.16);
     border-radius: 16px;
@@ -79,7 +79,7 @@
   }
 
   .btn-secondary {
-    background: rgba(75, 78, 83, 0.8);
+    background: rgba(0, 0, 0, 0.8);
     color: var(--color-light-gray);
     padding: 12px 28px;
     border-radius: 12px;
@@ -122,6 +122,38 @@
   .gsap-btn {
     will-change: transform;
     transform-origin: center;
+  }
+
+  .sidebar-collapsed .group:hover .sidebar-tooltip {
+    opacity: 1;
+  }
+
+  .sidebar-expanded .sidebar-tooltip {
+    opacity: 0 !important;
+  }
+
+  .sidebar-collapsed .sidebar-header {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .sidebar-expanded .sidebar-header {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .sidebar-collapsed .sidebar-brand,
+  .sidebar-collapsed .sidebar-item {
+    justify-content: center;
+  }
+
+  .sidebar-expanded .sidebar-brand,
+  .sidebar-expanded .sidebar-item {
+    justify-content: flex-start;
+  }
+
+  .sidebar-expanded .sidebar-text {
+    text-align: left;
   }
 
   .animate-fade-in {

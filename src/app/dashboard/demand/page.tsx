@@ -51,7 +51,7 @@ export default function DemandPage() {
                             onClick={() => setSelectedDrug(i)}
                             className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all gsap-btn ${selectedDrug === i
                                     ? "bg-[var(--color-deep-red)] text-[var(--color-light-gray)] shadow-md"
-                                    : "bg-[rgba(75,78,83,0.72)] text-[rgba(224,226,228,0.78)] border border-[rgba(224,226,228,0.14)] hover:bg-[rgba(255,0,0,0.16)]"
+                                    : "bg-[rgba(0,0,0,0.72)] text-[rgba(224,226,228,0.78)] border border-[rgba(224,226,228,0.14)] hover:bg-[rgba(255,0,0,0.16)]"
                                 }`}
                         >
                             {d.drug}
@@ -111,7 +111,7 @@ export default function DemandPage() {
                                             tickLine={false}
                                         />
                                         <Tooltip
-                                            contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#4B4E53", color: "#E0E2E4" }}
+                                            contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#000000", color: "#E0E2E4" }}
                                             labelFormatter={(label) => `Date: ${label}`}
                                         />
                                         <ReferenceLine
@@ -133,7 +133,7 @@ export default function DemandPage() {
                                                     key={i}
                                                     fill={
                                                         h.demand === 0
-                                                            ? "#4B4E53"
+                                                            ? "#000000"
                                                             : h.demand > spikeThreshold
                                                                 ? "#FF0000"
                                                                 : "#C00018"

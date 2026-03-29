@@ -65,7 +65,7 @@ export default function InventoryPage() {
                             onClick={() => setFilter(f)}
                             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors capitalize gsap-btn ${filter === f
                                     ? "bg-[var(--color-deep-red)] text-[var(--color-light-gray)]"
-                                    : "bg-[rgba(75,78,83,0.72)] text-[rgba(224,226,228,0.78)] border border-[rgba(224,226,228,0.14)] hover:bg-[rgba(255,0,0,0.16)]"
+                                    : "bg-[rgba(0,0,0,0.72)] text-[rgba(224,226,228,0.78)] border border-[rgba(224,226,228,0.14)] hover:bg-[rgba(255,0,0,0.16)]"
                                 }`}
                         >
                             {f === "all" ? "All Items" : f}

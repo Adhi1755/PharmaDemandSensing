@@ -17,7 +17,7 @@ interface LocationData {
 }
 
 const REGION_COLORS = [
-    "#FF0000", "#C00018", "#E0E2E4", "#4B4E53", "#FF0000", "#C00018",
+    "#FF0000", "#C00018", "#E0E2E4", "#000000", "#FF0000", "#C00018",
 ];
 
 const REGIONS = [
@@ -102,7 +102,7 @@ export default function InsightsPage() {
                                                 tickLine={false}
                                             />
                                             <Tooltip
-                                                contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#4B4E53", color: "#E0E2E4" }}
+                                                contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#000000", color: "#E0E2E4" }}
                                             />
                                             <Bar dataKey="demand" radius={[8, 8, 0, 0]} name="Total Demand">
                                                 {regionChartData.map((_, i) => (
@@ -125,7 +125,7 @@ export default function InsightsPage() {
                                                 tickLine={false}
                                             />
                                             <Tooltip
-                                                contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#4B4E53", color: "#E0E2E4" }}
+                                                contentStyle={{ borderRadius: 12, border: "1px solid rgba(224,226,228,0.18)", fontSize: 13, backgroundColor: "#000000", color: "#E0E2E4" }}
                                             />
                                             <Bar dataKey="demand" fill="#C00018" radius={[8, 8, 0, 0]} name="Demand" />
                                         </BarChart>
