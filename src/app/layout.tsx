@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Outfit } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import GlobalMotion from "@/components/GlobalMotion";
 
-const outfit = Outfit({
+const dmSans = DM_Sans({
   variable: "--font-inter",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
@@ -21,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.variable} h-full antialiased`}>
+    <html lang="en" className={`${dmSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-[family-name:var(--font-inter)]">
         <GlobalMotion />
         {children}
