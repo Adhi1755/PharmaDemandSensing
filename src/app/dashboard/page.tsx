@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
     XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, Area, AreaChart,
 } from "recharts";
 import Navbar from "@/components/Navbar";
-import LoadingSpinner from "@/components/LoadingSpinner";
 import {
     getAlerts,
     getDashboardStats,
@@ -48,6 +47,125 @@ interface TrendPoint {
     totalDemand: number;
 }
 
+/* ─── Animated counter ─── */
+function AnimatedNumber({ target, duration = 1200, suffix = "" }: { target: number; duration?: number; suffix?: string }) {
+    const [current, setCurrent] = useState(0);
+    const started = useRef(false);
+
+    useEffect(() => {
+        if (started.current || target === 0) return;
+        started.current = true;
+        const start = Date.now();
+        const tick = () => {
+            const elapsed = Date.now() - start;
+            const progress = Math.min(elapsed / duration, 1);
+            // Ease-out cubic
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setCurrent(Math.round(target * eased));
+            if (progress < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+    }, [target, duration]);
+
+    return <>{current.toLocaleString()}{suffix}</>;
+}
+
+/* ─── KPI Card with stagger animation ─── */
+function KPICard({
+    label,
+    value,
+    sublabel,
+    delay = 0,
+    suffix = "",
+    isPercent = false,
+}: {
+    label: string;
+    value: number;
+    sublabel: string;
+    delay?: number;
+    suffix?: string;
+    isPercent?: boolean;
+}) {
+    const [visible, setVisible] = useState(false);
+
+    useEffect(() => {
+        const t = setTimeout(() => setVisible(true), delay);
+        return () => clearTimeout(t);
+    }, [delay]);
+
+    return (
+        <div
+            style={{
+                padding: "1.5rem",
+                borderBottom: "1px solid rgba(255,255,255,0.08)",
+                borderRight: "1px solid rgba(255,255,255,0.08)",
+                opacity: visible ? 1 : 0,
+                transform: visible ? "translateY(0)" : "translateY(20px)",
+                transition: "opacity 0.6s ease-out, transform 0.6s ease-out",
+            }}
+        >
+            <p style={{
+                fontSize: "0.72rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.12em",
+                color: "rgba(191,191,191,1)",
+                marginBottom: 10,
+            }}>
+                {label}
+            </p>
+            <p style={{ fontSize: "2rem", fontWeight: 700, color: "#fff", lineHeight: 1 }}>
+                {visible && value > 0 ? (
+                    <AnimatedNumber target={value} suffix={isPercent ? "%" : suffix} duration={1000} />
+                ) : (
+                    <span style={{ color: "rgba(255,255,255,0.2)" }}>—</span>
+                )}
+            </p>
+            <p style={{ fontSize: "0.75rem", color: "rgba(128,128,128,1)", marginTop: 6 }}>{sublabel}</p>
+        </div>
+    );
+}
+
+/* ─── Section fade-in wrapper ─── */
+function FadeSection({ children, delay = 0, style = {} }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
+    const [visible, setVisible] = useState(false);
+    useEffect(() => {
+        const t = setTimeout(() => setVisible(true), delay);
+        return () => clearTimeout(t);
+    }, [delay]);
+
+    return (
+        <div style={{
+            opacity: visible ? 1 : 0,
+            transform: visible ? "translateY(0)" : "translateY(16px)",
+            transition: "opacity 0.6s ease-out, transform 0.6s ease-out",
+            ...style,
+        }}>
+            {children}
+        </div>
+    );
+}
+
+/* ─── Page enter overlay ─── */
+function PageEnterOverlay() {
+    const [visible, setVisible] = useState(true);
+    useEffect(() => {
+        const t = setTimeout(() => setVisible(false), 800);
+        return () => clearTimeout(t);
+    }, []);
+
+    if (!visible) return null;
+    return (
+        <div style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9998,
+            background: "#000",
+            pointerEvents: "none",
+            animation: "dashboardEnter 0.8s ease-out forwards",
+        }} />
+    );
+}
+
 export default function DashboardPage() {
     const router = useRouter();
     const [stats, setStats] = useState<Stats | null>(null);
@@ -64,14 +182,11 @@ export default function DashboardPage() {
     const [activeResult, setActiveResult] = useState<ModelOutput | null>(null);
     const [resultsError, setResultsError] = useState("");
     const [loading, setLoading] = useState(true);
+    const [chartAnimating, setChartAnimating] = useState(false);
 
     useEffect(() => {
         const raw = localStorage.getItem(LOCAL_USER_KEY);
-        if (!raw) {
-            router.replace("/login");
-            return;
-        }
-
+        if (!raw) { router.replace("/login"); return; }
         let user: AuthUser;
         try {
             user = JSON.parse(raw) as AuthUser;
@@ -80,7 +195,6 @@ export default function DashboardPage() {
             router.replace("/login");
             return;
         }
-
         if (user.isNewUser || !user.hasUploadedData) {
             router.replace("/onboarding");
             return;
@@ -94,26 +208,21 @@ export default function DashboardPage() {
                 setAlerts(a);
                 setTrend(t);
             })
-            .finally(() => setLoading(false));
+            .finally(() => {
+                setLoading(false);
+                setTimeout(() => setChartAnimating(true), 300);
+            });
     }, [router]);
 
     useEffect(() => {
-        if (!email) {
-            return;
-        }
-
+        if (!email) return;
         getModelStatus(email)
             .then((res) => setModelStatus(res.status))
-            .catch(() => {
-                // Dashboard still works with core sample data.
-            });
+            .catch(() => {});
     }, [email]);
 
     useEffect(() => {
-        if (!email) {
-            return;
-        }
-
+        if (!email) return;
         getResults(email, selectedModel)
             .then((res) => {
                 setResultsError("");
@@ -126,151 +235,228 @@ export default function DashboardPage() {
             });
     }, [email, selectedModel]);
 
-    if (loading) return <LoadingSpinner text="Loading dashboard..." />;
+    if (loading) {
+        return (
+            <div style={{
+                minHeight: "100vh",
+                background: "#000",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                gap: 20,
+            }}>
+                <div style={{ position: "relative", width: 56, height: 56 }}>
+                    <svg width="56" height="56" viewBox="0 0 56 56" style={{ animation: "spin 1s linear infinite" }}>
+                        <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,0,0,0.15)" strokeWidth="3" />
+                        <circle cx="28" cy="28" r="24" fill="none" stroke="#FF0000" strokeWidth="3"
+                            strokeDasharray="150.8" strokeDashoffset="113.1" strokeLinecap="round" />
+                    </svg>
+                </div>
+                <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.9rem" }}>Loading dashboard...</p>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+        );
+    }
 
-    const alertTypeStyles: Record<string, string> = {
-        critical: "border-l-[var(--color-primary)] bg-[rgba(255,0,0,0.14)]",
-        warning: "border-l-[var(--color-deep-red)] bg-[rgba(255,77,77,0.16)]",
-        info: "border-l-[rgba(128,128,128,1)] bg-[rgba(255,255,255,0.12)]",
+    const alertTypeStyles: Record<string, React.CSSProperties> = {
+        critical: { borderLeft: "3px solid #FF0000", background: "rgba(255,0,0,0.08)" },
+        warning: { borderLeft: "3px solid #FF4D4D", background: "rgba(255,77,77,0.08)" },
+        info: { borderLeft: "3px solid rgba(128,128,128,0.6)", background: "rgba(255,255,255,0.04)" },
     };
 
     return (
         <>
+            <style>{`
+                @keyframes spin { to { transform: rotate(360deg); } }
+                @keyframes dashboardEnter { from { opacity: 1; } to { opacity: 0; } }
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes drawLine { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
+                .model-tab:hover { background: rgba(255,0,0,0.08) !important; color: #fff !important; }
+                .drug-row:hover { background: rgba(255,0,0,0.06) !important; }
+            `}</style>
+
+            <PageEnterOverlay />
             <Navbar title="Dashboard" subtitle="Overview of pharmaceutical demand analytics" />
-            <div className="min-h-full bg-black p-0">
-                <div className="scroll-section border border-[rgba(255,255,255,0.12)] bg-[#000000]">
-                    {/* Row 1: KPI Blocks */}
-                    <section className="border-b border-[rgba(255,255,255,0.12)]">
-                        <div className="grid grid-cols-1 gap-0 sm:grid-cols-2 xl:grid-cols-4">
-                            <div className="border-b border-[rgba(255,255,255,0.12)] p-6 sm:border-r xl:border-b-0">
-                                <p className="text-xs uppercase tracking-widest text-[rgba(191,191,191,1)] mb-2">Total Drugs</p>
-                                <p className="text-3xl font-semibold text-[var(--color-light-gray)]">{stats?.totalDrugs ?? 0}</p>
-                                <p className="text-xs text-[rgba(128,128,128,1)] mt-1">Active pharmaceutical products</p>
-                            </div>
-                            <div className="border-b border-[rgba(255,255,255,0.12)] p-6 xl:border-r xl:border-b-0">
-                                <p className="text-xs uppercase tracking-widest text-[rgba(191,191,191,1)] mb-2">Predicted Demand (7d)</p>
-                                <p className="text-3xl font-semibold text-[var(--color-light-gray)]">{stats?.predictedDemand7d?.toLocaleString() ?? "0"}</p>
-                                <p className="text-xs text-[rgba(128,128,128,1)] mt-1">Units forecasted for next week</p>
-                            </div>
-                            <div className="border-b border-[rgba(255,255,255,0.12)] p-6 sm:border-r xl:border-b-0 xl:border-r">
-                                <p className="text-xs uppercase tracking-widest text-[rgba(191,191,191,1)] mb-2">High Demand Alerts</p>
-                                <p className="text-3xl font-semibold text-[var(--color-light-gray)]">{stats?.highDemandAlerts ?? 0}</p>
-                                <p className="text-xs text-[rgba(128,128,128,1)] mt-1">Drugs needing attention</p>
-                            </div>
-                            <div className="p-6">
-                                <p className="text-xs uppercase tracking-widest text-[rgba(191,191,191,1)] mb-2">Forecast Accuracy</p>
-                                <p className="text-3xl font-semibold text-[var(--color-light-gray)]">{`${stats?.avgForecastAccuracy ?? 0}%`}</p>
-                                <p className="text-xs text-[rgba(128,128,128,1)] mt-1">TFT model performance</p>
-                            </div>
+
+            <div style={{ minHeight: "100%", background: "#000" }}>
+                <div style={{ border: "1px solid rgba(255,255,255,0.1)", background: "#000" }}>
+
+                    {/* ── Row 1: KPI Cards ── */}
+                    <section style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
+                            <KPICard
+                                label="Total Drugs"
+                                value={stats?.totalDrugs ?? 0}
+                                sublabel="Active pharmaceutical products"
+                                delay={100}
+                            />
+                            <KPICard
+                                label="Predicted Demand (7d)"
+                                value={stats?.predictedDemand7d ?? 0}
+                                sublabel="Units forecasted for next week"
+                                delay={220}
+                            />
+                            <KPICard
+                                label="High Demand Alerts"
+                                value={stats?.highDemandAlerts ?? 0}
+                                sublabel="Drugs needing attention"
+                                delay={340}
+                            />
+                            <KPICard
+                                label="Forecast Accuracy"
+                                value={stats?.avgForecastAccuracy ?? 0}
+                                sublabel="TFT model performance"
+                                delay={460}
+                                isPercent
+                            />
                         </div>
                     </section>
 
-                    {/* Row 2: Chart + Side Panel */}
-                    <section className="grid grid-cols-1 gap-0 border-b border-[rgba(255,255,255,0.12)] xl:grid-cols-12">
-                        <div className="xl:col-span-8 p-6 lg:p-8 border-b border-[rgba(255,255,255,0.12)] xl:border-b-0 xl:border-r">
-                            <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">Demand Trend</h2>
-                            <p className="text-sm text-[rgba(191,191,191,1)] mb-4">Total demand over the last 30 days</p>
-                            <div className="h-72">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={trend}>
-                                        <defs>
-                                            <linearGradient id="colorDemand" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#FF0000" stopOpacity={0.35} />
-                                                <stop offset="95%" stopColor="#FF0000" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" />
-                                        <XAxis
-                                            dataKey="date"
-                                            tick={{ fontSize: 11, fill: "#FFFFFF" }}
-                                            tickFormatter={(v) => v.slice(5)}
-                                            axisLine={false}
-                                            tickLine={false}
-                                        />
-                                        <YAxis
-                                            tick={{ fontSize: 11, fill: "#FFFFFF" }}
-                                            axisLine={false}
-                                            tickLine={false}
-                                        />
-                                        <Tooltip
-                                            contentStyle={{
-                                                borderRadius: 12,
-                                                border: "1px solid rgba(255,255,255,0.12)",
-                                                backgroundColor: "#000000",
-                                                fontSize: 13,
-                                                color: "#FFFFFF",
+                    {/* ── Row 2: Chart + Top Drugs ── */}
+                    <FadeSection delay={500} style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "8fr 4fr" }}>
+                            {/* Chart */}
+                            <div style={{ padding: "1.5rem 2rem", borderRight: "1px solid rgba(255,255,255,0.1)" }}>
+                                <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+                                    Demand Trend
+                                </h2>
+                                <p style={{ fontSize: "0.82rem", color: "rgba(191,191,191,1)", marginBottom: "1rem" }}>
+                                    Total demand over the last 30 days
+                                </p>
+                                <div style={{ height: 280 }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={chartAnimating ? trend : []}>
+                                            <defs>
+                                                <linearGradient id="colorDemand" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#FF0000" stopOpacity={0.35} />
+                                                    <stop offset="95%" stopColor="#FF0000" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                                            <XAxis
+                                                dataKey="date"
+                                                tick={{ fontSize: 11, fill: "#FFFFFF" }}
+                                                tickFormatter={(v) => v.slice(5)}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis tick={{ fontSize: 11, fill: "#FFFFFF" }} axisLine={false} tickLine={false} />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    borderRadius: 6,
+                                                    border: "1px solid rgba(255,0,0,0.3)",
+                                                    backgroundColor: "#0D1117",
+                                                    fontSize: 12,
+                                                    color: "#FFFFFF",
+                                                }}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="totalDemand"
+                                                stroke="#FF0000"
+                                                strokeWidth={2.5}
+                                                fill="url(#colorDemand)"
+                                                name="Total Demand"
+                                                isAnimationActive={chartAnimating}
+                                                animationDuration={1800}
+                                                animationEasing="ease-out"
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            {/* Top Drugs */}
+                            <div style={{ padding: "1.5rem" }}>
+                                <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+                                    Top Recommended Drugs
+                                </h2>
+                                <p style={{ fontSize: "0.82rem", color: "rgba(191,191,191,1)", marginBottom: "1rem" }}>
+                                    Highest predicted demand
+                                </p>
+                                <div style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
+                                    {topDrugs.map((drug, i) => (
+                                        <div
+                                            key={drug.id}
+                                            className="drug-row"
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 12,
+                                                padding: "10px 12px",
+                                                borderBottom: i < topDrugs.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
+                                                background: "transparent",
+                                                transition: "background 0.2s ease",
+                                                opacity: 0,
+                                                animation: `slideUp 0.4s ease-out ${0.6 + i * 0.1}s forwards`,
+                                                cursor: "default",
                                             }}
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="totalDemand"
-                                            stroke="#FF0000"
-                                            strokeWidth={2.5}
-                                            fill="url(#colorDemand)"
-                                            name="Total Demand"
-                                        />
-                                    </AreaChart>
-                                </ResponsiveContainer>
+                                        >
+                                            <span style={{
+                                                width: 28, height: 28, flexShrink: 0,
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                fontSize: "0.72rem", fontWeight: 700,
+                                                border: "1px solid rgba(255,0,0,0.3)",
+                                                background: "rgba(255,0,0,0.12)",
+                                                color: "#fff",
+                                            }}>{i + 1}</span>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <p style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                    {drug.name}
+                                                </p>
+                                                <p style={{ fontSize: "0.72rem", color: "rgba(191,191,191,1)" }}>{drug.category}</p>
+                                            </div>
+                                            <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                                <p style={{ fontSize: "0.82rem", fontWeight: 700, color: "#fff" }}>{drug.predictedDemand}</p>
+                                                <p style={{
+                                                    fontSize: "0.72rem", fontWeight: 600,
+                                                    color: drug.changePercent > 0 ? "#34D399" : drug.changePercent < 0 ? "#F85149" : "rgba(191,191,191,1)",
+                                                }}>
+                                                    {drug.changePercent > 0 ? "+" : ""}{drug.changePercent}%
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
+                    </FadeSection>
 
-                        <div className="xl:col-span-4 p-6 lg:p-8">
-                            <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">Top Recommended Drugs</h2>
-                            <p className="text-sm text-[rgba(191,191,191,1)] mb-4">Highest predicted demand</p>
-                            <div className="border border-[rgba(255,255,255,0.12)]">
-                                {topDrugs.map((drug, i) => (
-                                    <div
-                                        key={drug.id}
-                                        className="flex items-center gap-4 p-3 border-b border-[rgba(255,255,255,0.12)] last:border-b-0 bg-[rgba(13,15,18,0.45)] hover:bg-[rgba(13,15,18,0.65)] transition-colors"
-                                    >
-                                        <span className="w-8 h-8 flex items-center justify-center text-[var(--color-light-gray)] font-bold text-sm shrink-0 border border-[rgba(255,255,255,0.12)] bg-[rgba(255,0,0,0.18)]">
-                                            {i + 1}
-                                        </span>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-[var(--color-light-gray)] truncate">{drug.name}</p>
-                                            <p className="text-xs text-[rgba(191,191,191,1)]">{drug.category}</p>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="text-sm font-bold text-[var(--color-light-gray)]">{drug.predictedDemand}</p>
-                                            <p className={`text-xs font-semibold ${drug.changePercent > 0 ? "text-[var(--color-primary)]" : drug.changePercent < 0 ? "text-[var(--color-deep-red)]" : "text-[rgba(191,191,191,1)]"}`}>
-                                                {drug.changePercent > 0 ? "+" : ""}{drug.changePercent}%
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                    {/* ── Row 3: Alerts ── */}
+                    <FadeSection delay={700} style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", padding: "1.5rem 2rem" }}>
+                        <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: 4 }}>Active Alerts</h2>
+                        <p style={{ fontSize: "0.82rem", color: "rgba(191,191,191,1)", marginBottom: "1rem" }}>Stock and demand notifications</p>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid rgba(255,255,255,0.1)" }}>
+                            {alerts.map((alert, i) => (
+                                <div
+                                    key={i}
+                                    style={{
+                                        padding: 16,
+                                        borderBottom: i < alerts.length - 2 ? "1px solid rgba(255,255,255,0.08)" : "none",
+                                        borderRight: i % 2 === 0 ? "1px solid rgba(255,255,255,0.08)" : "none",
+                                        ...(alertTypeStyles[alert.type] ?? alertTypeStyles.info),
+                                        opacity: 0,
+                                        animation: `slideUp 0.4s ease-out ${0.8 + i * 0.1}s forwards`,
+                                    }}
+                                >
+                                    <p style={{ fontSize: "0.85rem", fontWeight: 600, color: "#fff", marginBottom: 4 }}>{alert.title}</p>
+                                    <p style={{ fontSize: "0.78rem", color: "rgba(191,191,191,1)", lineHeight: 1.5 }}>{alert.message}</p>
+                                </div>
+                            ))}
                         </div>
-                    </section>
+                    </FadeSection>
 
-                    {/* Row 3: Full-width Alerts */}
-                    <section className="p-6 lg:p-8">
-                            <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">Active Alerts</h2>
-                            <p className="text-sm text-[rgba(191,191,191,1)] mb-4">Stock and demand notifications</p>
-                            <div className="grid grid-cols-1 gap-0 md:grid-cols-2 border border-[rgba(255,255,255,0.12)]">
-                                {alerts.map((alert, i) => (
-                                    <div
-                                        key={i}
-                                        className={`border-b border-r border-[rgba(255,255,255,0.12)] p-4 md:[&:nth-child(2n)]:border-r-0 [&:nth-last-child(-n+2)]:md:border-b-0 [&:last-child]:border-b-0 ${alertTypeStyles[alert.type] || "border-l-[rgba(128,128,128,1)] bg-[rgba(255,255,255,0.12)]"}`}
-                                    >
-                                        <p className="text-sm font-semibold text-[var(--color-light-gray)] mb-1">{alert.title}</p>
-                                        <p className="text-xs text-[rgba(191,191,191,1)] leading-relaxed">{alert.message}</p>
-                                    </div>
-                                ))}
-                            </div>
-                    </section>
-
-                    <section className="border-t border-[rgba(255,255,255,0.12)] p-6 lg:p-8">
-                        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    {/* ── Row 4: AI Model Results ── */}
+                    <FadeSection delay={900} style={{ padding: "1.5rem 2rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem", flexWrap: "wrap", gap: 12 }}>
                             <div>
-                                <h2 className="text-lg font-bold text-[var(--color-light-gray)] mb-1">AI Model Results</h2>
-                                <p className="text-sm text-[rgba(191,191,191,1)]">Forecast graph, metrics, demand patterns, and recommendations</p>
+                                <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: 4 }}>AI Model Results</h2>
+                                <p style={{ fontSize: "0.82rem", color: "rgba(191,191,191,1)" }}>Forecast graph, metrics, demand patterns, and recommendations</p>
                             </div>
-                            <div className="grid grid-cols-3 border border-[rgba(255,255,255,0.12)]">
-                                {([
-                                    ["linear", "Linear"],
-                                    ["rf", "RF"],
-                                    ["tft", "TFT"],
-                                ] as const).map(([key, label]) => {
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                                {([ ["linear", "Linear"], ["rf", "RF"], ["tft", "TFT"]] as const).map(([key, label]) => {
                                     const ready = modelStatus[key] === "ready" || key === "linear";
                                     return (
                                         <button
@@ -278,11 +464,20 @@ export default function DashboardPage() {
                                             type="button"
                                             disabled={!ready}
                                             onClick={() => setSelectedModel(key)}
-                                            className={`px-4 py-2 text-xs uppercase tracking-widest border-r border-[rgba(255,255,255,0.12)] last:border-r-0 ${
-                                                selectedModel === key
-                                                    ? "bg-[rgba(255,0,0,0.2)] text-white"
-                                                    : "bg-[#0D1117] text-[rgba(191,191,191,1)]"
-                                            } disabled:cursor-not-allowed disabled:opacity-50`}
+                                            className="model-tab"
+                                            style={{
+                                                padding: "8px 18px",
+                                                fontSize: "0.72rem",
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.1em",
+                                                borderRight: key !== "tft" ? "1px solid rgba(255,255,255,0.1)" : "none",
+                                                background: selectedModel === key ? "rgba(255,0,0,0.2)" : "#0D1117",
+                                                color: selectedModel === key ? "#fff" : "rgba(191,191,191,1)",
+                                                border: "none",
+                                                cursor: ready ? "pointer" : "not-allowed",
+                                                opacity: ready ? 1 : 0.45,
+                                                transition: "background 0.2s ease, color 0.2s ease",
+                                            }}
                                         >
                                             {label}
                                         </button>
@@ -291,44 +486,56 @@ export default function DashboardPage() {
                             </div>
                         </div>
 
-                        <div className="mb-5 grid grid-cols-1 gap-0 md:grid-cols-3 border border-[rgba(255,255,255,0.12)]">
-                            {([
-                                ["linear", "Linear Regression"],
-                                ["rf", "Random Forest"],
-                                ["tft", "TFT"],
-                            ] as const).map(([key, label]) => (
-                                <div key={key} className="border-b border-r border-[rgba(255,255,255,0.12)] p-4 last:border-r-0 md:border-b-0">
-                                    <p className="text-xs uppercase tracking-widest text-[rgba(191,191,191,1)]">{label}</p>
-                                    <p className="mt-1 text-sm text-[var(--color-light-gray)]">{modelStatus[key]}</p>
+                        {/* Model Status */}
+                        <div style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(3, 1fr)",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                            marginBottom: "1.25rem",
+                        }}>
+                            {([ ["linear", "Linear Regression"], ["rf", "Random Forest"], ["tft", "TFT"]] as const).map(([key, label]) => (
+                                <div key={key} style={{ padding: 16, borderRight: key !== "tft" ? "1px solid rgba(255,255,255,0.08)" : "none" }}>
+                                    <p style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(191,191,191,1)" }}>{label}</p>
+                                    <p style={{
+                                        marginTop: 6, fontSize: "0.85rem",
+                                        color: modelStatus[key] === "ready" ? "#34D399" : modelStatus[key] === "training" ? "#F59E0B" : "rgba(139,148,158,1)",
+                                        fontWeight: 500,
+                                    }}>
+                                        {modelStatus[key] === "ready" ? "✓ Ready" : modelStatus[key] === "training" ? "⟳ Training" : modelStatus[key]}
+                                    </p>
                                 </div>
                             ))}
                         </div>
 
                         {activeResult ? (
-                            <div className="space-y-5">
-                                <div className="grid grid-cols-1 gap-0 border border-[rgba(255,255,255,0.12)] md:grid-cols-4">
-                                    <div className="border-b border-r border-[rgba(255,255,255,0.12)] p-4 md:border-b-0">
-                                        <p className="text-xs uppercase tracking-widest text-[rgba(191,191,191,1)]">Model</p>
-                                        <p className="mt-1 text-sm font-semibold text-[var(--color-light-gray)]">{activeResult.model}</p>
-                                    </div>
-                                    <div className="border-b border-r border-[rgba(255,255,255,0.12)] p-4 md:border-b-0">
-                                        <p className="text-xs uppercase tracking-widest text-[rgba(191,191,191,1)]">Accuracy</p>
-                                        <p className="mt-1 text-sm font-semibold text-[var(--color-light-gray)]">{activeResult.accuracy}%</p>
-                                    </div>
-                                    <div className="border-b border-r border-[rgba(255,255,255,0.12)] p-4 md:border-b-0">
-                                        <p className="text-xs uppercase tracking-widest text-[rgba(191,191,191,1)]">MAE</p>
-                                        <p className="mt-1 text-sm font-semibold text-[var(--color-light-gray)]">{activeResult.mae}</p>
-                                    </div>
-                                    <div className="p-4">
-                                        <p className="text-xs uppercase tracking-widest text-[rgba(191,191,191,1)]">Volatility</p>
-                                        <p className="mt-1 text-sm font-semibold text-[var(--color-light-gray)]">{activeResult.demandPattern.volatility}</p>
-                                    </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                                {/* Metric row */}
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                                    {[
+                                        { label: "Model", val: activeResult.model },
+                                        { label: "Accuracy", val: `${activeResult.accuracy}%` },
+                                        { label: "MAE", val: String(activeResult.mae) },
+                                        { label: "Volatility", val: activeResult.demandPattern.volatility },
+                                    ].map((m, i) => (
+                                        <div key={m.label} style={{
+                                            padding: 16,
+                                            borderRight: i < 3 ? "1px solid rgba(255,255,255,0.08)" : "none",
+                                            opacity: 0,
+                                            animation: `slideUp 0.4s ease-out ${1.0 + i * 0.07}s forwards`,
+                                        }}>
+                                            <p style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(191,191,191,1)" }}>{m.label}</p>
+                                            <p style={{ marginTop: 6, fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>{m.val}</p>
+                                        </div>
+                                    ))}
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-0 border border-[rgba(255,255,255,0.12)] xl:grid-cols-12">
-                                    <div className="xl:col-span-8 border-b border-[rgba(255,255,255,0.12)] p-6 xl:border-b-0 xl:border-r">
-                                        <h3 className="mb-3 text-sm uppercase tracking-widest text-[rgba(191,191,191,1)]">Forecast Graph</h3>
-                                        <div className="h-72">
+                                {/* Forecast chart + recommendations */}
+                                <div style={{ display: "grid", gridTemplateColumns: "8fr 4fr", border: "1px solid rgba(255,255,255,0.1)" }}>
+                                    <div style={{ padding: "1.5rem", borderRight: "1px solid rgba(255,255,255,0.08)" }}>
+                                        <h3 style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(191,191,191,1)", marginBottom: 12 }}>
+                                            Forecast Graph
+                                        </h3>
+                                        <div style={{ height: 280 }}>
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <AreaChart data={activeResult.graphData}>
                                                     <defs>
@@ -337,28 +544,64 @@ export default function DashboardPage() {
                                                             <stop offset="95%" stopColor="#FF0000" stopOpacity={0} />
                                                         </linearGradient>
                                                     </defs>
-                                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" />
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
                                                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#FFFFFF" }} axisLine={false} tickLine={false} />
                                                     <YAxis tick={{ fontSize: 11, fill: "#FFFFFF" }} axisLine={false} tickLine={false} />
                                                     <Tooltip
                                                         contentStyle={{
-                                                            borderRadius: 0,
-                                                            border: "1px solid rgba(255,255,255,0.12)",
-                                                            backgroundColor: "#000000",
+                                                            borderRadius: 6,
+                                                            border: "1px solid rgba(255,0,0,0.3)",
+                                                            backgroundColor: "#0D1117",
                                                             color: "#FFFFFF",
                                                         }}
                                                     />
-                                                    <Area type="monotone" dataKey="actual" stroke="#9CA3AF" strokeWidth={2} fill="transparent" name="Actual" />
-                                                    <Area type="monotone" dataKey="predicted" stroke="#FF0000" strokeWidth={2.5} fill="url(#modelPred)" name="Predicted" />
+                                                    <Area
+                                                        type="monotone"
+                                                        dataKey="actual"
+                                                        stroke="#9CA3AF"
+                                                        strokeWidth={2}
+                                                        fill="transparent"
+                                                        name="Actual"
+                                                        isAnimationActive={true}
+                                                        animationDuration={1600}
+                                                        animationEasing="ease-out"
+                                                    />
+                                                    <Area
+                                                        type="monotone"
+                                                        dataKey="predicted"
+                                                        stroke="#FF0000"
+                                                        strokeWidth={2.5}
+                                                        fill="url(#modelPred)"
+                                                        name="Predicted"
+                                                        isAnimationActive={true}
+                                                        animationDuration={2000}
+                                                        animationEasing="ease-out"
+                                                    />
                                                 </AreaChart>
                                             </ResponsiveContainer>
                                         </div>
                                     </div>
-                                    <div className="xl:col-span-4 p-6">
-                                        <h3 className="mb-3 text-sm uppercase tracking-widest text-[rgba(191,191,191,1)]">Recommendations</h3>
-                                        <div className="border border-[rgba(255,255,255,0.12)]">
+                                    <div style={{ padding: "1.5rem" }}>
+                                        <h3 style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(191,191,191,1)", marginBottom: 12 }}>
+                                            Recommendations
+                                        </h3>
+                                        <div style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
                                             {activeResult.recommendations.map((item, idx) => (
-                                                <div key={idx} className="border-b border-[rgba(255,255,255,0.12)] p-3 text-xs text-[rgba(191,191,191,1)] last:border-b-0">
+                                                <div
+                                                    key={idx}
+                                                    style={{
+                                                        padding: "10px 12px",
+                                                        borderBottom: idx < activeResult.recommendations.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none",
+                                                        fontSize: "0.78rem",
+                                                        color: "rgba(191,191,191,1)",
+                                                        lineHeight: 1.5,
+                                                        display: "flex",
+                                                        gap: 8,
+                                                        opacity: 0,
+                                                        animation: `slideUp 0.4s ease-out ${1.2 + idx * 0.1}s forwards`,
+                                                    }}
+                                                >
+                                                    <span style={{ color: "#FF4D4D", flexShrink: 0 }}>→</span>
                                                     {item}
                                                 </div>
                                             ))}
@@ -367,11 +610,17 @@ export default function DashboardPage() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] p-4 text-sm text-[rgba(191,191,191,1)]">
+                            <div style={{
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                background: "rgba(255,255,255,0.03)",
+                                padding: 16,
+                                fontSize: "0.85rem",
+                                color: "rgba(191,191,191,1)",
+                            }}>
                                 {resultsError || "No training results available yet. Complete onboarding and run model training."}
                             </div>
                         )}
-                    </section>
+                    </FadeSection>
                 </div>
             </div>
         </>
