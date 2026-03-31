@@ -3,25 +3,20 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-    getModelStatus,
     getPreviewData,
-    getResults,
     processData,
     saveUserDetails,
-    trainModel,
     uploadDataset,
     type AuthUser,
-    type ModelOutput,
 } from "@/lib/api";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4;
 
 const STEP_LABELS: { id: Step; title: string }[] = [
     { id: 1, title: "Profile" },
     { id: 2, title: "Upload" },
     { id: 3, title: "Preview" },
     { id: 4, title: "Process" },
-    { id: 5, title: "Training" },
 ];
 
 const LOCAL_USER_KEY = "pharmasens_user";
@@ -518,13 +513,6 @@ export default function OnboardingPage() {
     const [processing, setProcessing] = useState(false);
     const [processedRows, setProcessedRows] = useState<number | null>(null);
 
-    /* Step 5 */
-    const [trainingStarted, setTrainingStarted] = useState(false);
-    const [trainingQuickResult, setTrainingQuickResult] = useState<ModelOutput | null>(null);
-    const [modelStatus, setModelStatus] = useState<{ linear: string; rf: string; tft: string }>({ linear: "not_started", rf: "not_started", tft: "not_started" });
-    const [selectedModel, setSelectedModel] = useState<"linear" | "rf" | "tft">("linear");
-    const [activeResult, setActiveResult] = useState<ModelOutput | null>(null);
-
     /* Transition overlays */
     const [showInsightsOverlay, setShowInsightsOverlay] = useState(false);
 
@@ -550,18 +538,6 @@ export default function OnboardingPage() {
             .then((res) => { setColumns(res.columns); setPreviewRows(res.preview); })
             .catch(() => {});
     }, [user, step, previewRows.length, columns.length]);
-
-    /* Model polling — Step 5 */
-    useEffect(() => {
-        if (!user || step !== 5 || !trainingStarted) return;
-        const tick = () => {
-            getModelStatus(user.email).then((res) => setModelStatus(res.status)).catch(() => {});
-            getResults(user.email, selectedModel).then((res) => { setActiveResult(res.active); if (res.results.linear) setTrainingQuickResult(res.results.linear); }).catch(() => {});
-        };
-        tick();
-        const id = window.setInterval(tick, 3000);
-        return () => window.clearInterval(id);
-    }, [user, step, trainingStarted, selectedModel]);
 
     /* Auto-detect columns */
     useEffect(() => {
@@ -612,38 +588,26 @@ export default function OnboardingPage() {
 
     const handleProcess = async () => {
         if (!user) return;
-        // Fallback: if auto-detect missed columns, pick non-empty ones
         const dc = dateColumn || columns.find((c) => detectColumnRole(c) === "date") || columns[0] || "";
         const sc = salesColumn || columns.find((c) => detectColumnRole(c) === "sales") || columns[1] || "";
         const dk = drugColumn || columns.find((c) => detectColumnRole(c) === "drug") || columns[2] || "";
         if (!dc || !sc || !dk) { setGlobalError("Could not auto-detect required columns. Please try a different dataset."); return; }
         if (new Set([dc, sc, dk]).size !== 3) { setGlobalError("Date, sales, and drug columns must be different."); return; }
-        setGlobalError(""); setStep(4); setProcessing(true);
+        setGlobalError(""); setStep(4 as Step); setProcessing(true);
         try {
             const res = await processData({ email: user.email, dateColumn: dc, salesColumn: sc, drugColumn: dk, locationColumn: locationColumn || undefined });
             setProcessedRows(res.processedRows);
-        } catch (err) { setGlobalError(err instanceof Error ? err.message : "Processing failed"); setStep(3); }
+            // Mark user as onboarded and go straight to dashboard
+            const updatedUser: AuthUser = { ...user, isNewUser: false, hasUploadedData: true };
+            setUser(updatedUser);
+            localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(updatedUser));
+            setShowInsightsOverlay(true);
+            setTimeout(() => router.push("/dashboard"), 2400);
+        } catch (err) { setGlobalError(err instanceof Error ? err.message : "Processing failed"); setStep(3 as Step); }
         finally { setProcessing(false); }
     };
 
-    const handleStartTraining = async () => {
-        if (!user) return; setGlobalError(""); setStep(5);
-        try {
-            const res = await trainModel(user.email);
-            setTrainingStarted(true); setTrainingQuickResult(res.linear); setActiveResult(res.linear);
-            setModelStatus({ linear: "ready", rf: "training", tft: "training" });
-            const updatedUser: AuthUser = { ...user, isNewUser: false, hasUploadedData: true };
-            setUser(updatedUser); localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(updatedUser));
-        } catch (err) { setGlobalError(err instanceof Error ? err.message : "Model training failed"); }
-    };
-
-    const handleContinueToDashboard = () => {
-        setShowInsightsOverlay(true);
-        setTimeout(() => router.push("/dashboard"), 2200);
-    };
-
     const onDropFile = (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) setSelectedFile(f); };
-    const statusText = (s: string) => s === "ready" ? "Ready" : s === "training" ? "Training" : s === "failed" ? "Failed" : "Pending";
 
     return (
         <>
@@ -675,7 +639,7 @@ export default function OnboardingPage() {
                         </header>
 
                         {/* Step tabs */}
-                        <div className="grid border-b border-[rgba(255,255,255,0.12)] sm:grid-cols-5">
+                        <div className="grid border-b border-[rgba(255,255,255,0.12)] sm:grid-cols-4">
                             {STEP_LABELS.map((item) => (
                                 <div key={item.id} className={`border-r border-[rgba(255,255,255,0.12)] px-4 py-3 text-xs uppercase tracking-widest last:border-r-0 ${step === item.id ? "bg-[rgba(248,81,73,0.16)] text-white" : step > item.id ? "bg-[rgba(255,255,255,0.04)] text-[#C9D1D9]" : "text-[#8B949E]"}`}>
                                     {step > item.id ? "✓ " : ""}Step {item.id}: {item.title}
@@ -776,60 +740,37 @@ export default function OnboardingPage() {
 
                             {/* ───────────────── STEP 4 ───────────────── */}
                             {step === 4 && (
-                                <div style={{ border: "1px solid rgba(255,255,255,0.12)", background: "#161B22", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem", animation: "fadeIn 0.4s ease-out" }}>
-                                    <p style={{ fontSize: "1.2rem", fontWeight: 300, color: "#fff" }}>Data Processing & Feature Engineering</p>
-                                    {processing ? (
-                                        <>
-                                            <p style={{ fontSize: "0.85rem", color: "rgba(139,148,158,1)" }}>Processing your data...</p>
-                                            <div style={{ height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" }}>
-                                                <div style={{ height: "100%", width: "60%", background: "linear-gradient(90deg,#FF0000,#FF4D4D)", borderRadius: 2, animation: "pulseDot 1.5s ease-in-out infinite" }} />
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <p style={{ fontSize: "0.85rem", color: "#34D399" }}>✓ Data successfully prepared.</p>
-                                            <p style={{ fontSize: "0.85rem", color: "rgba(139,148,158,1)" }}>{processedRows ?? 0} rows cleaned, sorted, and transformed with lag_1 to lag_7 features.</p>
-                                            <button type="button" onClick={handleStartTraining} className="btn-primary w-full justify-center">Start Model Training</button>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* ───────────────── STEP 5 ───────────────── */}
-                            {step === 5 && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", animation: "fadeIn 0.4s ease-out" }}>
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1rem" }}>
-                                        {([ ["linear", "Linear"], ["rf", "Random Forest"], ["tft", "TFT"]] as const).map(([key, label]) => (
-                                            <div key={key} style={{ border: "1px solid rgba(255,255,255,0.12)", background: "#161B22", padding: "12px 16px" }}>
-                                                <p style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(139,148,158,1)" }}>{label}</p>
-                                                <p style={{ marginTop: 8, fontSize: "0.85rem", fontWeight: 500, color: modelStatus[key] === "ready" ? "#34D399" : modelStatus[key] === "training" ? "#F85149" : "#8B949E" }}>{statusText(modelStatus[key])}</p>
-                                            </div>
-                                        ))}
+                                <div style={{ border: "1px solid rgba(255,255,255,0.12)", background: "#161B22", padding: "2rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem", animation: "fadeIn 0.4s ease-out" }}>
+                                    {/* Spinner */}
+                                    <div style={{ position: "relative", width: 72, height: 72 }}>
+                                        <svg width="72" height="72" viewBox="0 0 72 72" style={{ animation: "spin 1s linear infinite" }}>
+                                            <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,0,0,0.12)" strokeWidth="4"/>
+                                            <circle cx="36" cy="36" r="30" fill="none" stroke="#FF0000" strokeWidth="4" strokeDasharray="188.5" strokeDashoffset="141.4" strokeLinecap="round"/>
+                                        </svg>
+                                        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>⚡</div>
                                     </div>
-                                    <div style={{ border: "1px solid rgba(255,255,255,0.12)", background: "#161B22", padding: "16px 20px" }}>
-                                        <p style={{ fontSize: "0.9rem", color: "#fff" }}>⚡ Quick results ready</p>
-                                        <p style={{ marginTop: 4, fontSize: "0.82rem", color: "rgba(139,148,158,1)" }}>Advanced models are training in background.</p>
+                                    <div style={{ textAlign: "center" }}>
+                                        <p style={{ fontSize: "1.1rem", fontWeight: 700, color: "#fff", marginBottom: 6 }}>
+                                            {processing ? "Processing & Training Model..." : "✓ Complete — Redirecting..."}
+                                        </p>
+                                        <p style={{ fontSize: "0.82rem", color: "rgba(139,148,158,1)" }}>
+                                            {processing
+                                                ? "Cleaning data, engineering features and fitting the forecast model"
+                                                : `${processedRows ?? 0} rows processed · Taking you to your dashboard`
+                                            }
+                                        </p>
                                     </div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-                                        {([ ["linear", "Linear"], ["rf", "Random Forest"], ["tft", "TFT"]] as const).map(([key, label]) => (
-                                            <button key={key} type="button" onClick={() => setSelectedModel(key)} disabled={modelStatus[key] !== "ready" && key !== "linear"} style={{ border: selectedModel === key ? "1px solid rgba(248,81,73,0.7)" : "1px solid rgba(255,255,255,0.12)", background: selectedModel === key ? "rgba(248,81,73,0.18)" : "#0D1117", color: selectedModel === key ? "#fff" : "rgba(201,209,217,1)", padding: "12px 16px", fontSize: "0.85rem", cursor: "pointer", transition: "all 0.2s ease", opacity: modelStatus[key] !== "ready" && key !== "linear" ? 0.5 : 1 }}>{label}</button>
-                                        ))}
-                                    </div>
-                                    {(activeResult || trainingQuickResult) && (
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                                            <div style={{ border: "1px solid rgba(255,255,255,0.12)", background: "#0D1117", padding: 16 }}>
-                                                <p style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(139,148,158,1)" }}>Model Accuracy</p>
-                                                <p style={{ marginTop: 8, fontSize: "1.6rem", fontWeight: 700, color: "#fff" }}>{(activeResult || trainingQuickResult)?.accuracy}%</p>
-                                            </div>
-                                            <div style={{ border: "1px solid rgba(255,255,255,0.12)", background: "#0D1117", padding: 16 }}>
-                                                <p style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(139,148,158,1)" }}>Mean Absolute Error</p>
-                                                <p style={{ marginTop: 8, fontSize: "1.6rem", fontWeight: 700, color: "#fff" }}>{(activeResult || trainingQuickResult)?.mae}</p>
-                                            </div>
+                                    {/* Animated progress track */}
+                                    <div style={{ width: "100%", maxWidth: 340 }}>
+                                        <div style={{ height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
+                                            <div style={{ height: "100%", width: processing ? "65%" : "100%", background: processing ? "linear-gradient(90deg,#FF0000,#FF4D4D)" : "#34D399", borderRadius: 2, transition: "width 1.5s cubic-bezier(0.4,0,0.2,1), background 0.5s ease", boxShadow: processing ? "0 0 10px rgba(255,0,0,0.5)" : "0 0 10px rgba(52,211,153,0.5)" }} />
                                         </div>
-                                    )}
-                                    <button type="button" onClick={handleContinueToDashboard} className="cta-btn" style={{ width: "100%", background: "linear-gradient(135deg,#FF0000,#FF4D4D)", color: "#fff", padding: "15px 28px", fontWeight: 700, fontSize: "1rem", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "transform 0.2s ease, box-shadow 0.2s ease", letterSpacing: "0.04em" }}>
-                                        <span>✦</span> Continue to Dashboard <span>→</span>
-                                    </button>
+                                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                                            {["Cleaning", "Features", "Training", "Done"].map((lbl, i) => (
+                                                <span key={lbl} style={{ fontSize: "0.6rem", color: !processing && i === 3 ? "#34D399" : processing && i < 2 ? "rgba(201,209,217,0.7)" : "rgba(139,148,158,0.4)", transition: "color 0.4s ease" }}>{lbl}</span>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
