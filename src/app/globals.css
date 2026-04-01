@@ -207,6 +207,41 @@
   }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-5px); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.6; }
+}
+
+@keyframes glow-col {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.35); }
+}
+
+@keyframes dashboardEnter {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes shimmer {
+  from { opacity: 0.4; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideToken {
+  0%   { transform: translateX(0); opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateX(-120px); opacity: 0; }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
