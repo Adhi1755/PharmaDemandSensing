@@ -74,23 +74,23 @@ const whyCards = [
 
 const models = [
   {
-    name: "Linear Regression",
-    detail: "Fast baseline predictions for immediate demand signals.",
-    note: "Best for quick operational checks",
-    badge: "Fast",
+    name: "XGBoost Classifier",
+    detail: "High-accuracy gradient-boosted classification for demand patterns.",
+    note: "Best for demand classification & feature importance",
+    badge: "Primary",
     badgeColor: "bg-[#1A3A1A] text-[#4ADE80]",
   },
   {
     name: "Random Forest",
-    detail: "Robust ensemble performance for irregular demand patterns.",
+    detail: "Robust ensemble classification for irregular demand patterns.",
     note: "Balanced speed and reliability",
     badge: "Balanced",
     badgeColor: "bg-[#1E3A5F] text-[#60A5FA]",
   },
   {
-    name: "Temporal Fusion Transformer",
-    detail: "Advanced time-series forecasting for deeper pattern understanding.",
-    note: "High-accuracy strategic forecasting",
+    name: "LSTM Neural Network",
+    detail: "Deep learning time-series forecasting for future demand prediction.",
+    note: "Sequential forecasting with temporal memory",
     badge: "Advanced",
     badgeColor: "bg-[#3B1F6B] text-[#C084FC]",
   },

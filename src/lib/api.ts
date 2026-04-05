@@ -17,6 +17,8 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
     return res.json();
 }
 
+// ─── Auth ─────────────────────────────────────────────────────
+
 export interface AuthUser {
     name: string;
     email: string;
@@ -24,7 +26,6 @@ export interface AuthUser {
     hasUploadedData: boolean;
 }
 
-// Auth
 export const login = (email: string, password: string) =>
     fetchAPI<{ message: string; user: AuthUser }>("/api/login", {
         method: "POST",
@@ -37,7 +38,8 @@ export const signup = (name: string, email: string, password: string) =>
         body: JSON.stringify({ name, email, password }),
     });
 
-// Onboarding and pipeline
+// ─── Onboarding ───────────────────────────────────────────────
+
 export const saveUserDetails = (payload: {
     email: string;
     fullName: string;
@@ -85,151 +87,142 @@ export const processData = (payload: {
         body: JSON.stringify(payload),
     });
 
-export interface ModelOutput {
-    model: string;
-    accuracy: number;
-    mae: number;
-    graphData: { date: string; actual: number; predicted: number }[];
-    futureForecast: { date: string; predicted: number }[];
-    demandPattern: {
-        avgDemand: number;
-        maxDemand: number;
-        minDemand: number;
-        volatility: number;
+// ─── ML Prediction ────────────────────────────────────────────
+
+export interface PredictionResult {
+    xgboost: {
+        accuracy: number;
+        precision: number;
+        recall: number;
+        f1: number;
     };
-    recommendations: string[];
-    quickSummary: string;
+    randomForest: {
+        accuracy: number;
+        precision: number;
+        recall: number;
+        f1: number;
+    } | null;
+    demandDistribution: { label: string; count: number }[];
+    featureImportance: { feature: string; importance: number }[];
+    insights: {
+        type: string;
+        title: string;
+        message: string;
+        severity: string;
+    }[];
+    totalSamples: number;
+    demandThresholds: { low: number; high: number };
 }
 
-export const trainModel = (email: string) =>
-    fetchAPI<{ message: string; note: string; linear: ModelOutput }>("/api/train-model", {
+export const predictDemand = (email: string) =>
+    fetchAPI<PredictionResult>("/api/predict", {
         method: "POST",
         body: JSON.stringify({ email }),
     });
 
-export const getModelStatus = (email: string) =>
-    fetchAPI<{
-        status: { linear: string; rf: string; tft: string };
-        readyModels: string[];
-    }>(`/api/model-status?email=${encodeURIComponent(email)}`);
+// ─── LSTM Forecast ────────────────────────────────────────────
 
-export const getResults = (email: string, model: "linear" | "rf" | "tft" = "linear") =>
-    fetchAPI<{
-        selectedModel: string;
-        status: { linear: string; rf: string; tft: string };
-        results: Partial<Record<"linear" | "rf" | "tft", ModelOutput>>;
-        active: ModelOutput;
-        userStatus: { isNewUser: boolean; hasUploadedData: boolean };
-    }>(`/api/results?email=${encodeURIComponent(email)}&model=${model}`);
+export interface ForecastResult {
+    historical: { date: string; actual: number }[];
+    pastPredictions: { date: string; predicted: number }[];
+    futureForecast: { date: string; predicted: number }[];
+    horizon: number;
+    totalHistorical: number;
+}
 
-// Dashboard
-export const getDashboardStats = () =>
-    fetchAPI<{
-        totalDrugs: number;
-        predictedDemand7d: number;
-        highDemandAlerts: number;
-        avgForecastAccuracy: number;
-    }>("/api/dashboard-stats");
+export const forecastDemand = (email: string, horizon: number = 14) =>
+    fetchAPI<ForecastResult>("/api/forecast", {
+        method: "POST",
+        body: JSON.stringify({ email, horizon }),
+    });
 
-export const getTopDrugs = () =>
+// ─── Dashboard ────────────────────────────────────────────────
+
+export interface DashboardFull {
+    kpi: {
+        accuracy: number;
+        precision: number;
+        recall: number;
+        f1: number;
+    };
+    rfMetrics: {
+        accuracy: number;
+        precision: number;
+        recall: number;
+        f1: number;
+    } | null;
+    demandDistribution: { label: string; count: number }[];
+    featureImportance: { feature: string; importance: number }[];
+    insights: {
+        type: string;
+        title: string;
+        message: string;
+        severity: string;
+    }[];
+    forecast: ForecastResult;
+    totalSamples: number;
+    demandThresholds: { low: number; high: number };
+}
+
+export const getDashboardFull = (email: string) =>
+    fetchAPI<DashboardFull>(`/api/dashboard-full?email=${encodeURIComponent(email)}`);
+
+export const getDashboardStats = (email: string) =>
+    fetchAPI<{
+        accuracy: number;
+        precision: number;
+        recall: number;
+        f1: number;
+        totalSamples: number;
+    }>(`/api/dashboard-stats?email=${encodeURIComponent(email)}`);
+
+export const getTopDrugs = (email: string) =>
     fetchAPI<
         {
-            id: number;
             name: string;
-            category: string;
-            predictedDemand: number;
+            totalDemand: number;
+            avgDemand: number;
             trend: string;
             changePercent: number;
         }[]
-    >("/api/top-drugs");
+    >(`/api/top-drugs?email=${encodeURIComponent(email)}`);
 
-export const getAlerts = () =>
-    fetchAPI<{ type: string; title: string; message: string }[]>("/api/alerts");
+export const getAlerts = (email: string) =>
+    fetchAPI<{ type: string; title: string; message: string }[]>(
+        `/api/alerts?email=${encodeURIComponent(email)}`
+    );
 
-export const getTrendData = () =>
-    fetchAPI<{ date: string; totalDemand: number }[]>("/api/trend-data");
+export const getTrendData = (email: string) =>
+    fetchAPI<{ date: string; totalDemand: number }[]>(
+        `/api/trend-data?email=${encodeURIComponent(email)}`
+    );
 
-// Forecast
-export const getDrugs = () =>
-    fetchAPI<{ id: number; name: string; category: string }[]>("/api/drugs");
+// ─── Model Insights ───────────────────────────────────────────
 
-export const getForecast = (drug: string, horizon: number = 7) =>
-    fetchAPI<{
-        drug: string;
-        horizon: number;
-        historical: { date: string; demand: number }[];
-        forecast: {
-            date: string;
-            predicted: number;
-            lower_bound: number;
-            upper_bound: number;
-        }[];
-    }>(`/api/forecast?drug=${encodeURIComponent(drug)}&horizon=${horizon}`);
+export const getFeatureImportance = (email: string) =>
+    fetchAPI<{ feature: string; importance: number }[]>(
+        `/api/feature-importance?email=${encodeURIComponent(email)}`
+    );
 
-// Inventory
-export const getInventory = () =>
-    fetchAPI<
-        {
-            id: number;
-            name: string;
-            category: string;
-            currentStock: number;
-            predictedDemand: number;
-            safetyStock: number;
-            suggestedReorder: number;
-            status: string;
-        }[]
-    >("/api/inventory");
-
-// Model Insights
-export const getModelMetrics = () =>
+export const getModelMetrics = (email: string) =>
     fetchAPI<{
         models: {
             name: string;
             shortName: string;
-            mae: number;
-            rmse: number;
             accuracy: number;
-            mape: number;
-            trainingTime: string;
+            precision: number;
+            recall: number;
+            f1: number;
             description: string;
         }[];
-    }>("/api/model-metrics");
+    }>(`/api/model-metrics?email=${encodeURIComponent(email)}`);
 
-export const getFeatureImportance = () =>
-    fetchAPI<{ feature: string; importance: number }[]>("/api/feature-importance");
-
-// Insights
-export const getAIInsights = () =>
+export const getInsights = (email: string) =>
     fetchAPI<
         {
             type: string;
-            severity: string;
             title: string;
             message: string;
-            action: string;
+            severity: string;
         }[]
-    >("/api/insights");
-
-export const getLocationInsights = (region?: string) =>
-    fetchAPI<
-        {
-            region: string;
-            district: string;
-            totalDemand: number;
-            drugs: { drug: string; demand: number }[];
-        }[]
-    >(`/api/location-insights${region ? `?region=${encodeURIComponent(region)}` : ""}`);
-
-export const getIntermittentDemand = () =>
-    fetchAPI<
-        {
-            drug: string;
-            category: string;
-            history: { date: string; demand: number }[];
-            zeroDays: number;
-            totalDays: number;
-            intermittencyRate: number;
-            spikeCount: number;
-        }[]
-    >("/api/intermittent-demand");
+    >(`/api/insights?email=${encodeURIComponent(email)}`);
