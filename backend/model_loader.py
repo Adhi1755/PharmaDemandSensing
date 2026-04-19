@@ -5,6 +5,7 @@ Loads XGBoost, Random Forest, and LSTM models once at startup and caches them.
 
 import os
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +64,13 @@ def _load_all():
                 global LSTM_SEQ_LEN
                 LSTM_SEQ_LEN = inp_shape[1] if inp_shape[1] is not None else 10
             logger.info("LSTM classifier loaded from %s (seq_len=%d)", lstm_path, LSTM_SEQ_LEN)
+        except ModuleNotFoundError:
+            logger.error(
+                "TensorFlow not installed for Python %s. LSTM disabled; forecast route will use fallback.",
+                sys.version.split()[0],
+            )
         except Exception as e:
-            logger.error("Failed to load LSTM model: %s", e)
+            logger.error("Failed to load LSTM model: %s. Forecast route will use fallback.", e)
     else:
         logger.warning("LSTM model not found at %s", lstm_path)
 

@@ -1,14 +1,19 @@
 """
 ML Prediction and Forecasting routes.
-Provides /api/predict (XGBoost classification) and /api/forecast (LSTM time-series).
+Provides /api/predict (XGBoost + RF classification) and /api/forecast (LSTM time-series).
+
+All endpoints return the standardised envelope:
+    { "status": "success"|"failed"|"fallback", "data": {...}, "message": "" }
 """
 
 import logging
 import numpy as np
 import pandas as pd
 from flask import Blueprint, jsonify, request
+from sklearn.preprocessing import MinMaxScaler
 
-from data.store import datasets_db, prediction_db, store_lock, users_db
+from data.auth_db import get_user
+from data.store import datasets_db, model_state_db, prediction_db, store_lock
 from model_loader import (
     CLASSIFIER_FEATURES,
     LSTM_FEATURES,
@@ -16,6 +21,13 @@ from model_loader import (
     get_lstm_model,
     get_rf_model,
     get_xgb_model,
+)
+from pipeline.sales_pipeline import predict_and_decode
+from routes.fallback import (
+    build_fallback_forecast_data,
+    compute_dataset_averages,
+    is_valid_result,
+    wrap_response,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,16 +46,21 @@ def _get_email():
 def _require_processed_data(email):
     """Return (processed_df, error_response)."""
     if not email:
-        return None, (jsonify({"error": "Email is required"}), 400)
-    with store_lock:
-        user = users_db.get(email)
+        return None, (jsonify(wrap_response(None, status="failed", message="Email is required")), 400)
+    user = get_user(email)
     if not user:
-        return None, (jsonify({"error": "User not found"}), 404)
+        return None, (jsonify(wrap_response(None, status="failed", message="User not found")), 404)
     with store_lock:
         dataset = datasets_db.get(email)
     if not dataset or dataset.get("processed") is None:
-        return None, (jsonify({"error": "No processed data. Upload and process a dataset first."}), 400)
+        return None, (jsonify(wrap_response(None, status="failed", message="No processed data. Upload and process a dataset first.")), 400)
     return dataset["processed"].copy(), None
+
+
+def _get_pipeline_state(email):
+    with store_lock:
+        state = model_state_db.get(email, {}).get("sales_pipeline")
+    return state
 
 
 def _classify_demand(quantity_series):
@@ -62,6 +79,76 @@ def _classify_demand(quantity_series):
     return quantity_series.apply(_classify), q33, q66
 
 
+def _build_fallback_forecast(data, horizon):
+    """Forecast using a simple trend + rolling baseline when LSTM is unavailable."""
+    if data.empty:
+        return {
+            "historical": [],
+            "pastPredictions": [],
+            "futureForecast": [],
+            "horizon": horizon,
+            "totalHistorical": 0,
+            "model": "fallback",
+            "accuracy": None,
+            "message": "No historical data available for fallback forecast.",
+        }
+
+    hist_dates = data["date"].dt.strftime("%Y-%m-%d").tolist()
+    qty = data["quantity"].astype(float)
+    hist_values = qty.round(2).tolist()
+
+    historical = [
+        {"date": d, "actual": float(v)}
+        for d, v in zip(hist_dates[-60:], hist_values[-60:])
+    ]
+
+    rolling7 = qty.rolling(window=7, min_periods=1).mean()
+    day_trend = rolling7.diff().tail(14).mean()
+    if pd.isna(day_trend):
+        day_trend = 0.0
+
+    baseline = float(rolling7.iloc[-1]) if len(rolling7) else float(qty.mean())
+    baseline = max(0.0, baseline)
+
+    past_predictions = []
+    backcast_vals = rolling7.tail(60).round(2).tolist()
+    backcast_dates = hist_dates[-len(backcast_vals):]
+    for d, v in zip(backcast_dates, backcast_vals):
+        past_predictions.append({"date": d, "predicted": float(v)})
+
+    future_forecast = []
+    last_date = data["date"].max()
+    current = baseline
+    for step in range(1, horizon + 1):
+        damp = max(0.2, 1 - (step / (horizon * 1.2)))
+        current = max(0.0, current + float(day_trend) * damp)
+        next_date = last_date + pd.Timedelta(days=step)
+        future_forecast.append({
+            "date": next_date.strftime("%Y-%m-%d"),
+            "predicted": round(float(current), 2),
+        })
+
+    # Compute RMSE-like metric comparing rolling mean to actual
+    overlap = min(len(backcast_vals), len(hist_values[-60:]))
+    if overlap > 0:
+        actual_arr = np.array(hist_values[-overlap:])
+        pred_arr = np.array(backcast_vals[-overlap:])
+        rmse = float(np.sqrt(np.mean((actual_arr - pred_arr) ** 2)))
+    else:
+        rmse = None
+
+    return {
+        "historical": historical,
+        "pastPredictions": past_predictions,
+        "futureForecast": future_forecast,
+        "horizon": horizon,
+        "totalHistorical": len(hist_values),
+        "model": "fallback",
+        "accuracy": round(rmse, 2) if rmse is not None else None,
+        "message": "LSTM unavailable; served fallback time-series forecast.",
+    }
+
+
 # ─────────────────────────────────────────────────────────────────
 # POST /api/predict — XGBoost + RF classification
 # ─────────────────────────────────────────────────────────────────
@@ -77,7 +164,7 @@ def predict():
     rf_model = get_rf_model()
 
     if not xgb_model:
-        return jsonify({"error": "XGBoost model not loaded"}), 500
+        return jsonify(wrap_response(None, status="failed", message="XGBoost model not loaded")), 500
 
     try:
         # Prepare features
@@ -92,26 +179,28 @@ def predict():
         y_true, q33, q66 = _classify_demand(processed["quantity"])
         y_true = y_true.values
 
-        # ── XGBoost predictions ──
-        xgb_pred = xgb_model.predict(X)
-        xgb_proba = None
-        if hasattr(xgb_model, "predict_proba"):
-            try:
-                xgb_proba = xgb_model.predict_proba(X)
-            except Exception:
-                pass
-
-        # Classification metrics
+        # ── Train/Test Split ──
+        from sklearn.model_selection import train_test_split
         from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-        xgb_accuracy = round(float(accuracy_score(y_true, xgb_pred)) * 100, 2)
-        xgb_precision = round(float(precision_score(y_true, xgb_pred, average="weighted", zero_division=0)) * 100, 2)
-        xgb_recall = round(float(recall_score(y_true, xgb_pred, average="weighted", zero_division=0)) * 100, 2)
-        xgb_f1 = round(float(f1_score(y_true, xgb_pred, average="weighted", zero_division=0)) * 100, 2)
+        split_idx = int(len(X) * 0.8)
+        X_train, X_test = X[:split_idx], X[split_idx:]
+        y_train, y_test = y_true[:split_idx], y_true[split_idx:]
+
+        # ── XGBoost predictions ──
+        xgb_pred_all = xgb_model.predict(X)
+        xgb_pred_train = xgb_model.predict(X_train)
+        xgb_pred_test = xgb_model.predict(X_test)
+
+        xgb_train_accuracy = round(float(accuracy_score(y_train, xgb_pred_train)) * 100, 2)
+        xgb_test_accuracy = round(float(accuracy_score(y_test, xgb_pred_test)) * 100, 2)
+        xgb_precision = round(float(precision_score(y_true, xgb_pred_all, average="weighted", zero_division=0)) * 100, 2)
+        xgb_recall = round(float(recall_score(y_true, xgb_pred_all, average="weighted", zero_division=0)) * 100, 2)
+        xgb_f1 = round(float(f1_score(y_true, xgb_pred_all, average="weighted", zero_division=0)) * 100, 2)
 
         # Demand distribution
         label_map = {0: "Low", 1: "Medium", 2: "High"}
-        pred_counts = pd.Series(xgb_pred).value_counts().to_dict()
+        pred_counts = pd.Series(xgb_pred_all).value_counts().to_dict()
         demand_distribution = [
             {"label": label_map.get(k, str(k)), "count": int(v)}
             for k, v in sorted(pred_counts.items())
@@ -128,26 +217,29 @@ def predict():
         rf_result = None
         if rf_model:
             try:
-                rf_pred = rf_model.predict(X)
-                rf_accuracy = round(float(accuracy_score(y_true, rf_pred)) * 100, 2)
-                rf_precision = round(float(precision_score(y_true, rf_pred, average="weighted", zero_division=0)) * 100, 2)
-                rf_recall = round(float(recall_score(y_true, rf_pred, average="weighted", zero_division=0)) * 100, 2)
-                rf_f1 = round(float(f1_score(y_true, rf_pred, average="weighted", zero_division=0)) * 100, 2)
+                rf_pred_all = rf_model.predict(X)
+                rf_pred_train = rf_model.predict(X_train)
+                rf_pred_test = rf_model.predict(X_test)
+
                 rf_result = {
-                    "accuracy": rf_accuracy,
-                    "precision": rf_precision,
-                    "recall": rf_recall,
-                    "f1": rf_f1,
+                    "train_accuracy": round(float(accuracy_score(y_train, rf_pred_train)) * 100, 2),
+                    "test_accuracy": round(float(accuracy_score(y_test, rf_pred_test)) * 100, 2),
+                    "accuracy": round(float(accuracy_score(y_true, rf_pred_all)) * 100, 2),
+                    "precision": round(float(precision_score(y_true, rf_pred_all, average="weighted", zero_division=0)) * 100, 2),
+                    "recall": round(float(recall_score(y_true, rf_pred_all, average="weighted", zero_division=0)) * 100, 2),
+                    "f1": round(float(f1_score(y_true, rf_pred_all, average="weighted", zero_division=0)) * 100, 2),
                 }
             except Exception as e:
                 logger.error("Random Forest prediction failed: %s", e)
 
         # Pharma insights from predictions
-        insights = _generate_pharma_insights(processed, xgb_pred, label_map)
+        insights = _generate_pharma_insights(processed, xgb_pred_all, label_map)
 
         result = {
             "xgboost": {
-                "accuracy": xgb_accuracy,
+                "train_accuracy": xgb_train_accuracy,
+                "test_accuracy": xgb_test_accuracy,
+                "accuracy": round(float(accuracy_score(y_true, xgb_pred_all)) * 100, 2),
                 "precision": xgb_precision,
                 "recall": xgb_recall,
                 "f1": xgb_f1,
@@ -167,11 +259,82 @@ def predict():
         with store_lock:
             prediction_db[email] = result
 
-        return jsonify(result), 200
+        return jsonify(wrap_response(result, message="Predictions generated successfully")), 200
 
     except Exception as exc:
         logger.exception("Prediction failed")
-        return jsonify({"error": f"Prediction failed: {exc}"}), 500
+        # Attempt fallback
+        try:
+            averages = compute_dataset_averages(processed)
+            return jsonify(wrap_response(averages, status="fallback", message=f"Prediction failed: {exc}")), 200
+        except Exception:
+            return jsonify(wrap_response(None, status="failed", message=f"Prediction failed: {exc}")), 500
+
+
+@predict_bp.route("/api/predict-sales", methods=["POST"])
+def predict_sales():
+    """Return decoded sales predictions from the trained per-user sales pipeline."""
+    email = _get_email()
+    if not email:
+        return jsonify(wrap_response(None, status="failed", message="Email is required")), 400
+
+    user = get_user(email)
+    if not user:
+        return jsonify(wrap_response(None, status="failed", message="User not found")), 404
+
+    pipeline_state = _get_pipeline_state(email)
+    if not pipeline_state:
+        return jsonify(wrap_response(None, status="failed", message="No trained sales pipeline found. Upload a raw monthly sales file first.")), 400
+
+    with store_lock:
+        dataset = datasets_db.get(email)
+
+    if not dataset or dataset.get("processed") is None:
+        return jsonify(wrap_response(None, status="failed", message="No processed data available for sales prediction.")), 400
+
+    payload = request.get_json(silent=True) or {}
+    model_name = str(payload.get("model", "xgboost")).strip().lower()
+    limit = int(payload.get("limit", 200) or 200)
+    limit = max(1, min(limit, 1000))
+
+    if model_name not in {"xgboost", "random_forest"}:
+        return jsonify(wrap_response(None, status="failed", message="Model must be one of: xgboost, random_forest")), 400
+
+    model = pipeline_state["xgb_model"] if model_name == "xgboost" else pipeline_state["rf_model"]
+    if model is None:
+        return jsonify(wrap_response(None, status="failed", message=f"Requested model '{model_name}' is unavailable.")), 400
+
+    try:
+        decoded = predict_and_decode(
+            model=model,
+            processed_df=dataset["processed"],
+            feature_columns=pipeline_state["feature_columns"],
+            encoders={
+                "medicine": pipeline_state["medicine_encoder"],
+                "category": pipeline_state["category_encoder"],
+            },
+        )
+        decoded = decoded.copy()
+        decoded["date"] = decoded["date"].dt.strftime("%Y-%m-%d")
+
+        records = decoded.head(limit).to_dict(orient="records")
+        result = {
+            "model": model_name,
+            "rows": int(len(decoded)),
+            "metrics": pipeline_state.get("metrics", {}).get(model_name, {}),
+            "featureColumns": pipeline_state["feature_columns"],
+            "predictions": records,
+        }
+
+        with store_lock:
+            prediction_db[email] = prediction_db.get(email, {})
+            prediction_db[email]["salesRegression"] = result
+
+        return jsonify(wrap_response(result, message="Sales predictions generated")), 200
+
+    except Exception as exc:
+        logger.exception("Decoded sales prediction failed")
+        return jsonify(wrap_response(None, status="failed", message=f"Decoded sales prediction failed: {exc}")), 500
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -185,16 +348,22 @@ def forecast():
     if err:
         return err
 
-    lstm_model = get_lstm_model()
-    if not lstm_model:
-        return jsonify({"error": "LSTM model not loaded"}), 500
-
     try:
-        horizon = int(request.get_json(silent=True).get("horizon", 14) or 14)
+        payload = request.get_json(silent=True) or {}
+        horizon = int(payload.get("horizon", 14) or 14)
         horizon = min(max(horizon, 7), 30)
 
         available = [f for f in LSTM_FEATURES if f in processed.columns]
         data = processed.sort_values("date")
+
+        lstm_model = get_lstm_model()
+        if not lstm_model:
+            result = _build_fallback_forecast(data, horizon)
+            with store_lock:
+                if email not in prediction_db:
+                    prediction_db[email] = {}
+                prediction_db[email]["forecast"] = result
+            return jsonify(wrap_response(result, status="fallback", message="LSTM model not available, using fallback forecast")), 200
 
         # Get historical data for the chart
         hist_dates = data["date"].dt.strftime("%Y-%m-%d").tolist()
@@ -204,49 +373,50 @@ def forecast():
             for d, v in zip(hist_dates[-60:], hist_values[-60:])
         ]
 
-        # Prepare sequences for LSTM
-        feature_data = data[available].values
+        # Prepare sequences for LSTM with proper MinMaxScaler
+        feature_data = data[available].values.astype(float)
         seq_len = LSTM_SEQ_LEN
 
         if len(feature_data) < seq_len:
-            return jsonify({"error": f"Need at least {seq_len} rows for LSTM. Got {len(feature_data)}."}), 400
+            result = _build_fallback_forecast(data, horizon)
+            with store_lock:
+                if email not in prediction_db:
+                    prediction_db[email] = {}
+                prediction_db[email]["forecast"] = result
+            return jsonify(wrap_response(result, status="fallback", message=f"Need at least {seq_len} rows for LSTM. Got {len(feature_data)}. Using fallback.")), 200
 
-        # Get the last sequence for iterative forecasting
-        last_seq = feature_data[-seq_len:].copy()
+        # ── MinMaxScaler normalization ──
+        scaler = MinMaxScaler()
+        scaled_features = scaler.fit_transform(feature_data)
 
-        # Scale features (simple min-max for inference)
-        fmin = feature_data.min(axis=0)
-        fmax = feature_data.max(axis=0)
-        frange = fmax - fmin
-        frange[frange == 0] = 1  # avoid division by zero
-
-        def scale(arr):
-            return (arr - fmin) / frange
-
-        def unscale_qty(val):
-            """Approximate unscaling based on quantity statistics."""
-            return val
+        # Quantity scaler for inverse transform on predictions
+        qty_values = data["quantity"].values.astype(float).reshape(-1, 1)
+        qty_scaler = MinMaxScaler()
+        qty_scaler.fit_transform(qty_values)
 
         # Run LSTM on historical data for past predictions
         past_predictions = []
-        if len(feature_data) > seq_len:
+        if len(scaled_features) > seq_len:
             sequences = []
-            for i in range(seq_len, min(len(feature_data), seq_len + 60)):
-                seq = scale(feature_data[i - seq_len:i])
+            for i in range(seq_len, min(len(scaled_features), seq_len + 60)):
+                seq = scaled_features[i - seq_len:i]
                 sequences.append(seq)
 
             if sequences:
                 batch = np.array(sequences)
                 preds_raw = lstm_model.predict(batch, verbose=0)
+
                 # Handle different output shapes
                 if len(preds_raw.shape) == 2 and preds_raw.shape[1] > 1:
-                    # Classification output — take argmax and map to quantity scale
+                    # Classification output — map to quantity scale
                     pred_classes = np.argmax(preds_raw, axis=1)
                     qty_mean = data["quantity"].mean()
                     qty_std = data["quantity"].std() or 1
                     pred_values = [(float(c) - 1) * qty_std + qty_mean for c in pred_classes]
                 elif len(preds_raw.shape) == 2 and preds_raw.shape[1] == 1:
-                    pred_values = preds_raw.flatten().tolist()
+                    # Regression output — inverse scale
+                    pred_scaled = preds_raw.flatten().reshape(-1, 1)
+                    pred_values = qty_scaler.inverse_transform(pred_scaled).flatten().tolist()
                 else:
                     pred_values = preds_raw.flatten().tolist()
 
@@ -256,12 +426,28 @@ def forecast():
                     if idx < len(hist_dates):
                         past_predictions.append({
                             "date": hist_dates[idx],
-                            "predicted": round(float(val), 2),
+                            "predicted": round(max(0, float(val)), 2),
                         })
+
+        # ── Compute accuracy (RMSE) on past predictions ──
+        accuracy_rmse = None
+        if past_predictions and historical:
+            actual_map = {h["date"]: h["actual"] for h in historical}
+            matched_actual = []
+            matched_pred = []
+            for pp in past_predictions:
+                if pp["date"] in actual_map:
+                    matched_actual.append(actual_map[pp["date"]])
+                    matched_pred.append(pp["predicted"])
+            if matched_actual:
+                accuracy_rmse = round(float(np.sqrt(np.mean(
+                    (np.array(matched_actual) - np.array(matched_pred)) ** 2
+                ))), 2)
 
         # Iterative future forecasting
         future_forecast = []
-        current_seq = scale(last_seq)
+        last_seq = scaled_features[-seq_len:].copy()
+        current_seq = last_seq
         last_date = data["date"].max()
 
         for step in range(1, horizon + 1):
@@ -274,7 +460,8 @@ def forecast():
                 qty_std = data["quantity"].std() or 1
                 pred_val = (pred_class - 1) * qty_std + qty_mean
             elif len(pred.shape) == 2 and pred.shape[1] == 1:
-                pred_val = float(pred[0][0])
+                pred_scaled = pred[0].reshape(-1, 1)
+                pred_val = float(qty_scaler.inverse_transform(pred_scaled)[0][0])
             else:
                 pred_val = float(pred.flatten()[0])
 
@@ -288,13 +475,15 @@ def forecast():
 
             # Shift sequence and append new prediction features
             new_row = current_seq[-1].copy()
-            # Update time-varying features
             if "sales_lag_1" in available:
                 lag1_idx = available.index("sales_lag_1")
-                new_row[lag1_idx] = (pred_val - fmin[lag1_idx]) / frange[lag1_idx]
+                raw_val = pred_val
+                # Scale to 0-1 range using qty_scaler
+                scaled_val = qty_scaler.transform([[raw_val]])[0][0]
+                new_row[lag1_idx] = scaled_val
             if "time_idx" in available:
                 tidx = available.index("time_idx")
-                new_row[tidx] = min(1.0, current_seq[-1][tidx] + 1.0 / frange[tidx])
+                new_row[tidx] = min(1.0, current_seq[-1][tidx] + 1.0 / max(len(feature_data), 1))
 
             current_seq = np.vstack([current_seq[1:], new_row.reshape(1, -1)])
 
@@ -304,7 +493,18 @@ def forecast():
             "futureForecast": future_forecast,
             "horizon": horizon,
             "totalHistorical": len(hist_values),
+            "model": "lstm",
+            "accuracy": accuracy_rmse,
         }
+
+        # Validate result — if forecast is empty or all zeros use fallback
+        if not is_valid_result(future_forecast):
+            result = _build_fallback_forecast(data, horizon)
+            with store_lock:
+                if email not in prediction_db:
+                    prediction_db[email] = {}
+                prediction_db[email]["forecast"] = result
+            return jsonify(wrap_response(result, status="fallback", message="LSTM returned empty forecast, using fallback")), 200
 
         # Cache forecast for dashboard
         with store_lock:
@@ -312,11 +512,25 @@ def forecast():
                 prediction_db[email] = {}
             prediction_db[email]["forecast"] = result
 
-        return jsonify(result), 200
+        return jsonify(wrap_response(result, message="LSTM forecast generated successfully")), 200
 
     except Exception as exc:
-        logger.exception("Forecast failed")
-        return jsonify({"error": f"Forecast failed: {exc}"}), 500
+        logger.exception("Forecast failed, serving fallback")
+        try:
+            safe_data = processed.sort_values("date")
+            fallback = _build_fallback_forecast(safe_data, 14)
+            with store_lock:
+                if email not in prediction_db:
+                    prediction_db[email] = {}
+                prediction_db[email]["forecast"] = fallback
+            return jsonify(wrap_response(fallback, status="fallback", message=f"LSTM failed: {exc}. Serving fallback.")), 200
+        except Exception:
+            logger.exception("Fallback forecast failed")
+            return jsonify(wrap_response(
+                {"forecast": None, "accuracy": None},
+                status="failed",
+                message=f"Forecast failed: {exc}",
+            )), 500
 
 
 # ─────────────────────────────────────────────────────────────────

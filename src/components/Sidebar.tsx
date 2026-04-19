@@ -19,10 +19,31 @@ const navItems = [
         ),
     },
     {
-        label: "Re-upload Data",
-        href: "/onboarding",
+        label: "Forecast",
+        href: "/dashboard/forecast",
         icon: (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="M19 9l-5 5-3-3-4 4" /></svg>
+        ),
+    },
+    {
+        label: "Models",
+        href: "/dashboard/models",
+        icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="2" /><circle cx="18" cy="6" r="2" /><circle cx="12" cy="18" r="2" /><path d="M8 7.5l2.5 7" /><path d="M16 7.5l-2.5 7" /><path d="M8 6h8" /></svg>
+        ),
+    },
+    {
+        label: "Inventory",
+        href: "/dashboard/inventory",
+        icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1.1-1.79l-7-3.5a2 2 0 0 0-1.8 0l-7 3.5A2 2 0 0 0 3 8v8a2 2 0 0 0 1.1 1.79l7 3.5a2 2 0 0 0 1.8 0l7-3.5A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 4.5L20.7 7" /><path d="M12 22V11.5" /></svg>
+        ),
+    },
+    {
+        label: "Profile",
+        href: "/dashboard/profile",
+        icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4" /><path d="M5.5 21a6.5 6.5 0 0 1 13 0" /></svg>
         ),
     },
 ];
@@ -103,7 +124,7 @@ export default function Sidebar() {
             duration: 0.16,
             ease: "power2.out",
             stagger: 0.015,
-            onComplete: () => gsap.set(".sidebar-text", { display: "none" }),
+            onComplete: () => { gsap.set(".sidebar-text", { display: "none" }); },
             overwrite: "auto",
         });
 
@@ -131,15 +152,20 @@ export default function Sidebar() {
                 ref={desktopSidebarRef}
                 onMouseEnter={handleExpand}
                 onMouseLeave={handleCollapse}
-                className="hidden lg:flex flex-col bg-[#000000] h-full fixed left-0 top-0 z-40 border-r border-[rgba(255,255,255,0.18)] overflow-hidden"
+                className="hidden lg:flex flex-col h-full fixed left-0 top-0 z-40 overflow-hidden"
+                style={{
+                    background: "linear-gradient(180deg, #06080D 0%, #080B10 100%)",
+                    borderRight: "1px solid rgba(255,255,255,0.06)",
+                    boxShadow: "2px 0 24px rgba(0,0,0,0.5)",
+                }}
             >
-                <div className="sidebar-header h-16 px-3 border-b border-[rgba(255,255,255,0.18)] flex items-center">
+                <div className="sidebar-header h-16 px-3 flex items-center" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                     <Link href="/" className="sidebar-brand flex items-center justify-center gap-0 no-underline w-full">
-                        <span className="text-(--color-primary) text-4xl font-light leading-none">+</span>
+                        <span style={{ color: "#DA3633", fontSize: "2.2rem", fontWeight: 300, lineHeight: 1 }}>+</span>
                     </Link>
                 </div>
 
-                <nav className="flex-1 py-0 px-0 overflow-y-auto">
+                <nav className="flex-1 py-2 px-0 overflow-y-auto">
                     {navItemsWithActive.map((item) => {
                         const { isActive } = item;
                         return (
@@ -147,15 +173,19 @@ export default function Sidebar() {
                                 key={item.href}
                                 href={item.href}
                                 data-sidebar-active={isActive}
-                                className={`sidebar-item relative group flex items-center justify-center gap-3 px-4 py-3 border-b border-[rgba(255,255,255,0.12)] text-sm font-medium transition-colors duration-200 no-underline ${isActive
-                                    ? "text-(--color-light-gray)"
-                                    : "text-[rgba(191,191,191,1)] hover:text-(--color-light-gray) hover:bg-[rgba(255,0,0,0.12)]"
-                                    }`}
-                                style={isActive ? { background: "linear-gradient(90deg, rgba(255, 77, 77, 0.3), rgba(255, 0, 0, 0.18))" } : undefined}
+                                className={`sidebar-item relative group flex items-center justify-center gap-3 px-4 py-3 text-sm font-medium transition-all duration-200 no-underline ${
+                                    isActive
+                                    ? "text-[#E6EDF3]"
+                                    : "text-[#6E7681] hover:text-[#C9D1D9]"
+                                }`}
+                                style={isActive ? {
+                                    background: "linear-gradient(90deg, rgba(218,54,51,0.22) 0%, rgba(218,54,51,0.06) 100%)",
+                                    borderLeft: "2px solid #DA3633",
+                                } : { borderLeft: "2px solid transparent" }}
                             >
-                                <span className={isActive ? "text-(--color-primary)" : ""}>{item.icon}</span>
+                                <span style={isActive ? { color: "#DA3633" } : undefined}>{item.icon}</span>
                                 <span className="sidebar-text whitespace-nowrap">{item.label}</span>
-                                <span className="sidebar-tooltip pointer-events-none absolute left-16 top-1/2 -translate-y-1/2 border border-[rgba(255,255,255,0.12)] bg-[rgba(0,0,0,0.96)] px-2 py-1 text-xs text-(--color-light-gray) opacity-0 transition-opacity duration-150 whitespace-nowrap z-50">
+                                <span className="sidebar-tooltip pointer-events-none absolute left-16 top-1/2 -translate-y-1/2 border border-[rgba(255,255,255,0.1)] bg-[rgba(4,6,10,0.97)] px-2.5 py-1.5 text-xs text-[#C9D1D9] opacity-0 transition-opacity duration-150 whitespace-nowrap z-50 rounded-lg shadow-xl">
                                     {item.label}
                                 </span>
                             </Link>
@@ -163,15 +193,24 @@ export default function Sidebar() {
                     })}
                 </nav>
 
-                <div className="border-t border-[rgba(255,255,255,0.12)]">
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
                     <button
                         type="button"
                         onClick={handleLogout}
-                        className="sidebar-item relative group w-full flex items-center justify-center gap-3 px-4 py-3 text-sm font-medium text-[rgba(191,191,191,1)] hover:text-(--color-light-gray) hover:bg-[rgba(255,0,0,0.12)] transition-colors duration-200"
+                        className="sidebar-item relative group w-full flex items-center justify-center gap-3 px-4 py-3.5 text-sm font-medium transition-all duration-200"
+                        style={{ color: "#6E7681", borderLeft: "2px solid transparent" }}
+                        onMouseEnter={e => {
+                            (e.currentTarget as HTMLButtonElement).style.color = "#F85149";
+                            (e.currentTarget as HTMLButtonElement).style.background = "rgba(218,54,51,0.08)";
+                        }}
+                        onMouseLeave={e => {
+                            (e.currentTarget as HTMLButtonElement).style.color = "#6E7681";
+                            (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                        }}
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
                         <span className="sidebar-text whitespace-nowrap">Logout</span>
-                        <span className="sidebar-tooltip pointer-events-none absolute left-16 top-1/2 -translate-y-1/2 border border-[rgba(255,255,255,0.12)] bg-[rgba(0,0,0,0.96)] px-2 py-1 text-xs text-(--color-light-gray) opacity-0 transition-opacity duration-150 whitespace-nowrap z-50">
+                        <span className="sidebar-tooltip pointer-events-none absolute left-16 top-1/2 -translate-y-1/2 border border-[rgba(255,255,255,0.1)] bg-[rgba(4,6,10,0.97)] px-2.5 py-1.5 text-xs text-[#C9D1D9] opacity-0 transition-opacity duration-150 whitespace-nowrap z-50 rounded-lg shadow-xl">
                             Logout
                         </span>
                     </button>
@@ -179,15 +218,22 @@ export default function Sidebar() {
             </aside>
 
             {/* Mobile bottom nav */}
-            <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#000000] border-t border-[rgba(255,255,255,0.12)] z-50 flex justify-around py-2 px-0">
+            <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex justify-around py-2 px-0"
+                style={{
+                    background: "rgba(8,11,16,0.98)",
+                    borderTop: "1px solid rgba(255,255,255,0.06)",
+                    backdropFilter: "blur(20px)",
+                }}
+            >
                 {navItemsWithActive.map((item) => {
                     const { isActive } = item;
                     return (
                         <Link
                             key={item.href}
                             href={item.href}
-                            className={`flex flex-col items-center gap-1 px-2 py-1.5 text-[10px] font-medium transition-colors no-underline ${isActive ? "text-(--color-primary)" : "text-[rgba(191,191,191,1)] hover:text-(--color-light-gray)"
-                                }`}
+                            className={`flex flex-col items-center gap-1 px-3 py-1.5 text-[10px] font-medium transition-colors no-underline rounded-xl ${
+                                isActive ? "text-[#DA3633]" : "text-[#6E7681] hover:text-[#C9D1D9]"
+                            }`}
                         >
                             {item.icon}
                             <span className="truncate max-w-15">{item.label}</span>

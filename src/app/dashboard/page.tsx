@@ -1,743 +1,372 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-    XAxis, YAxis, CartesianGrid, Tooltip,
-    ResponsiveContainer, Area, AreaChart,
-    BarChart, Bar, Cell, PieChart, Pie,
-} from "recharts";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
-import {
-    getDashboardFull,
-    getTopDrugs,
-    type AuthUser,
-    type DashboardFull,
-} from "@/lib/api";
+import EDAKPISection from "@/components/dashboard/EDAKPISection";
 
-const LOCAL_USER_KEY = "pharmasens_user";
+// ── Lazy-load charts ───────────────────────────────────────────
+const SalesTrendChart = dynamic(() => import("@/charts/SalesTrendChart"), {
+  ssr: false,
+  loading: () => <ChartSkeleton height="h-72" />,
+});
+const DrugSalesBarChart = dynamic(() => import("@/charts/DrugSalesBarChart"), {
+  ssr: false,
+  loading: () => <ChartSkeleton height="h-64" />,
+});
+const MonthlyDistributionChart = dynamic(
+  () => import("@/charts/MonthlyDistributionChart"),
+  {
+    ssr: false,
+    loading: () => <ChartSkeleton height="h-48" />,
+  }
+);
 
-/* ─── Animated counter ─── */
-function AnimatedNumber({ target, duration = 1200, suffix = "" }: { target: number; duration?: number; suffix?: string }) {
-    const [current, setCurrent] = useState(0);
-    const started = useRef(false);
-
-    useEffect(() => {
-        if (started.current || target === 0) return;
-        started.current = true;
-        const start = Date.now();
-        const tick = () => {
-            const elapsed = Date.now() - start;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            setCurrent(Math.round(target * eased * 100) / 100);
-            if (progress < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-    }, [target, duration]);
-
-    return <>{typeof current === "number" && current % 1 !== 0 ? current.toFixed(1) : current.toLocaleString()}{suffix}</>;
+// ── Types ────────────────────────────────────────────────────
+interface DashboardData {
+  status: string;
+  kpis: {
+    totalSales: number;
+    totalDrugs: number;
+    avgMonthlySales: number;
+    topDrug: string;
+  };
+  charts: {
+    trend: { date: string; sales: number }[];
+    topDrugs: { drug: string; sales: number }[];
+    monthly: { month: string; avgSales: number }[];
+  };
+  meta: {
+    months: number;
+    dateRange: { from: string; to: string };
+  };
 }
 
-/* ─── KPI Card ─── */
-function KPICard({
-    label,
-    value,
-    sublabel,
-    delay = 0,
-    color = "#FF0000",
+// ── Skeleton ─────────────────────────────────────────────────
+function ChartSkeleton({ height }: { height: string }) {
+  return <div className={`${height} skeleton rounded-xl`} />;
+}
+
+// ── Section Card ─────────────────────────────────────────────
+function SectionCard({
+  title,
+  subtitle,
+  accentColor = "#DA3633",
+  badge,
+  children,
 }: {
-    label: string;
-    value: number;
-    sublabel: string;
-    delay?: number;
-    color?: string;
+  title: string;
+  subtitle?: string;
+  accentColor?: string;
+  badge?: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    const [visible, setVisible] = useState(false);
-    useEffect(() => {
-        const t = setTimeout(() => setVisible(true), delay);
-        return () => clearTimeout(t);
-    }, [delay]);
-
-    return (
-        <div
-            style={{
-                padding: "1.5rem",
-                borderBottom: "1px solid rgba(255,255,255,0.08)",
-                borderRight: "1px solid rgba(255,255,255,0.08)",
-                opacity: visible ? 1 : 0,
-                transform: visible ? "translateY(0)" : "translateY(20px)",
-                transition: "opacity 0.6s ease-out, transform 0.6s ease-out",
-                position: "relative",
-                overflow: "hidden",
-            }}
-        >
-            {/* Subtle accent glow */}
-            <div style={{
-                position: "absolute", top: 0, left: 0, right: 0, height: 3,
-                background: `linear-gradient(90deg, ${color}, transparent)`,
-                opacity: 0.6,
-            }} />
-            <p style={{
-                fontSize: "0.72rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
-                color: "rgba(191,191,191,1)",
-                marginBottom: 10,
-            }}>
-                {label}
-            </p>
-            <p style={{ fontSize: "2.2rem", fontWeight: 700, color: "#fff", lineHeight: 1 }}>
-                {visible && value > 0 ? (
-                    <AnimatedNumber target={value} suffix="%" duration={1000} />
-                ) : (
-                    <span style={{ color: "rgba(255,255,255,0.2)" }}>—</span>
-                )}
-            </p>
-            <p style={{ fontSize: "0.75rem", color: "rgba(128,128,128,1)", marginTop: 6 }}>{sublabel}</p>
+  return (
+    <div className="chart-card relative overflow-hidden p-6">
+      {/* Top accent line */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
+        style={{ background: `linear-gradient(90deg, ${accentColor} 0%, transparent 70%)` }}
+      />
+      <div className="mb-5 flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-1.5"
+            style={{ color: "#6E7681" }}>
+            {subtitle ?? "Analytics"}
+          </p>
+          <h2 className="text-[15px] font-semibold" style={{ color: "#E6EDF3" }}>{title}</h2>
         </div>
-    );
+        {badge}
+      </div>
+      {children}
+    </div>
+  );
 }
 
-/* ─── Section fade wrapper ─── */
-function FadeSection({ children, delay = 0, style = {} }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
-    const [visible, setVisible] = useState(false);
-    useEffect(() => {
-        const t = setTimeout(() => setVisible(true), delay);
-        return () => clearTimeout(t);
-    }, [delay]);
-    return (
-        <div style={{
-            opacity: visible ? 1 : 0,
-            transform: visible ? "translateY(0)" : "translateY(16px)",
-            transition: "opacity 0.6s ease-out, transform 0.6s ease-out",
-            ...style,
-        }}>
-            {children}
-        </div>
-    );
+// ── Insight Pill ─────────────────────────────────────────────
+function InsightPill({
+  icon, label, value, color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  color: string;
+}) {
+  return (
+    <div
+      className="flex items-center gap-3 rounded-xl px-4 py-3 transition-colors duration-200"
+      style={{
+        background: "rgba(255,255,255,0.025)",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      <div
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+        style={{ background: `${color}14`, color }}
+      >
+        {icon}
+      </div>
+      <div>
+        <p className="text-[10px] uppercase tracking-widest" style={{ color: "#6E7681" }}>{label}</p>
+        <p className="text-sm font-medium mt-0.5" style={{ color: "#C9D1D9" }}>{value}</p>
+      </div>
+    </div>
+  );
 }
 
-/* ─── Section header ─── */
-function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
-    return (
-        <div style={{ marginBottom: "1.25rem" }}>
-            <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: 4 }}>{title}</h2>
-            <p style={{ fontSize: "0.82rem", color: "rgba(191,191,191,1)" }}>{subtitle}</p>
-        </div>
-    );
-}
-
-/* ─── Demand distribution donut label ─── */
-const DEMAND_COLORS: Record<string, string> = {
-    Low: "#34D399",
-    Medium: "#FBBF24",
-    High: "#F85149",
-};
-
-/* ─── Custom tooltip ─── */
-const CHART_TOOLTIP_STYLE: React.CSSProperties = {
-    borderRadius: 6,
-    border: "1px solid rgba(255,0,0,0.3)",
-    backgroundColor: "#0D1117",
-    fontSize: 12,
-    color: "#FFFFFF",
-};
-
-/* ─── Page enter overlay ─── */
-function PageEnterOverlay() {
-    const [visible, setVisible] = useState(true);
-    useEffect(() => {
-        const t = setTimeout(() => setVisible(false), 800);
-        return () => clearTimeout(t);
-    }, []);
-    if (!visible) return null;
-    return (
-        <div style={{
-            position: "fixed", inset: 0, zIndex: 9998,
-            background: "#000", pointerEvents: "none",
-            animation: "dashboardEnter 0.8s ease-out forwards",
-        }} />
-    );
-}
-
-/* ═══════════════════════════════════════════
-   MAIN DASHBOARD PAGE
-═══════════════════════════════════════════ */
-
-interface TopDrug {
-    name: string;
-    totalDemand: number;
-    avgDemand: number;
-    trend: string;
-    changePercent: number;
-}
-
+// ── Main page ────────────────────────────────────────────────
 export default function DashboardPage() {
-    const router = useRouter();
-    const routerRef = useRef(router);
-    const hasFetched = useRef(false);
-    const [dashboard, setDashboard] = useState<DashboardFull | null>(null);
-    const [topDrugs, setTopDrugs] = useState<TopDrug[]>([]);
-    const [email, setEmail] = useState("");
-    const [loading, setLoading] = useState(true);
-    const [chartAnimating, setChartAnimating] = useState(false);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-    // Keep router ref current without triggering re-renders
-    useEffect(() => {
-        routerRef.current = router;
-    });
+  useEffect(() => {
+    fetch("/api/dashboard")
+      .then((r) => r.json())
+      .then((json: DashboardData) => {
+        if (json.status === "error") throw new Error((json as { message?: string }).message ?? "Unknown error");
+        setData(json);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, []);
 
-    useEffect(() => {
-        if (hasFetched.current) return;
-        hasFetched.current = true;
+  const peakMonth = data?.charts.monthly.reduce(
+    (best, m) => (m.avgSales > best.avgSales ? m : best),
+    data.charts.monthly[0]
+  );
+  const lowestMonth = data?.charts.monthly.reduce(
+    (lowest, m) => (m.avgSales < lowest.avgSales ? m : lowest),
+    data.charts.monthly[0]
+  );
 
-        const raw = localStorage.getItem(LOCAL_USER_KEY);
-        if (!raw) { routerRef.current.replace("/login"); return; }
-        let user: AuthUser;
-        try {
-            user = JSON.parse(raw) as AuthUser;
-        } catch {
-            localStorage.removeItem(LOCAL_USER_KEY);
-            routerRef.current.replace("/login");
-            return;
-        }
-        if (user.isNewUser || !user.hasUploadedData) {
-            routerRef.current.replace("/onboarding");
-            return;
-        }
+  return (
+    <>
+      <Navbar title="EDA Dashboard" subtitle="Sales analytics · salesmonthly dataset" />
 
-        setEmail(user.email);
+      <main className="space-y-5 p-5 pb-24 md:p-6 lg:p-7 lg:pb-8 max-w-[1400px] mx-auto">
 
-        Promise.all([
-            getDashboardFull(user.email),
-            getTopDrugs(user.email),
-        ])
-            .then(([d, drugs]) => {
-                setDashboard(d);
-                setTopDrugs(drugs);
-            })
-            .catch((err) => {
-                console.error("Dashboard load error:", err);
-            })
-            .finally(() => {
-                setLoading(false);
-                setTimeout(() => setChartAnimating(true), 300);
-            });
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        {/* ── Error state ── */}
+        {error && (
+          <div className="rounded-xl p-4" style={{
+            background: "rgba(218,54,51,0.06)",
+            border: "1px solid rgba(218,54,51,0.25)",
+          }}>
+            <p className="text-sm font-medium" style={{ color: "#F85149" }}>⚠ Failed to load dataset</p>
+            <p className="mt-1 text-xs" style={{ color: "#8B949E" }}>{error}</p>
+          </div>
+        )}
 
-    if (loading) {
-        return (
-            <div style={{
-                minHeight: "100vh", background: "#000",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexDirection: "column", gap: 20,
+        {/* ── Dataset badge row ── */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium"
+            style={{
+              background: "rgba(218,54,51,0.07)",
+              border: "1px solid rgba(218,54,51,0.25)",
+              color: "#F87171",
             }}>
-                <div style={{ position: "relative", width: 56, height: 56 }}>
-                    <svg width="56" height="56" viewBox="0 0 56 56" style={{ animation: "spin 1s linear infinite" }}>
-                        <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,0,0,0.15)" strokeWidth="3" />
-                        <circle cx="28" cy="28" r="24" fill="none" stroke="#FF0000" strokeWidth="3"
-                            strokeDasharray="150.8" strokeDashoffset="113.1" strokeLinecap="round" />
-                    </svg>
-                </div>
-                <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.9rem" }}>Loading dashboard...</p>
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            </div>
-        );
-    }
+            <span className="h-1.5 w-1.5 rounded-full pulse-red" style={{ background: "#DA3633" }} />
+            salesmonthly.csv
+          </span>
+          {data && (
+            <span className="text-[11px]" style={{ color: "#6E7681" }}>
+              {data.meta.months} months · {data.meta.dateRange.from} → {data.meta.dateRange.to}
+            </span>
+          )}
+        </div>
 
-    const kpi = dashboard?.kpi;
-    const forecast = dashboard?.forecast;
-    const demandDist = dashboard?.demandDistribution || [];
-    const importance = dashboard?.featureImportance || [];
-    const insights = dashboard?.insights || [];
+        {/* ── KPI Row ── */}
+        <EDAKPISection
+          kpis={data?.kpis ?? null}
+          dateRange={data?.meta.dateRange}
+          months={data?.meta.months}
+        />
 
-    // Build combined chart data for LSTM forecast
-    const forecastChartData: { date: string; actual?: number; predicted?: number }[] = [];
-    if (forecast) {
-        // Historical
-        for (const h of forecast.historical || []) {
-            forecastChartData.push({ date: h.date, actual: h.actual });
-        }
-        // Past predictions overlay
-        const predMap = new Map<string, number>();
-        for (const p of forecast.pastPredictions || []) {
-            predMap.set(p.date, p.predicted);
-        }
-        for (const item of forecastChartData) {
-            if (predMap.has(item.date)) {
-                item.predicted = predMap.get(item.date);
+        {/* ── Demand Trend Chart ── */}
+        <SectionCard
+          title="Monthly Demand Trend"
+          subtitle="Time Series · All Drugs Combined"
+          accentColor="#DA3633"
+          badge={
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium"
+              style={{
+                background: "rgba(218,54,51,0.08)",
+                border: "1px solid rgba(218,54,51,0.2)",
+                color: "#F87171",
+              }}>
+              69 mo
+            </span>
+          }
+        >
+          <p className="mb-4 text-xs" style={{ color: "#6E7681" }}>
+            Total monthly sales across all 8 ATC drug categories
+          </p>
+          {data ? (
+            <SalesTrendChart data={data.charts.trend} />
+          ) : (
+            <ChartSkeleton height="h-72" />
+          )}
+        </SectionCard>
+
+        {/* ── Top Drugs + Monthly Distribution ── */}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+
+          {/* Top 5 Drugs bar */}
+          <SectionCard
+            title="Top 5 Drug Classes by Sales"
+            subtitle="Bar Chart · Total Volume"
+            accentColor="#F78166"
+            badge={
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium"
+                style={{
+                  background: "rgba(247,129,102,0.08)",
+                  border: "1px solid rgba(247,129,102,0.2)",
+                  color: "#F78166",
+                }}>
+                Top 5
+              </span>
             }
-        }
-        // Future forecast
-        for (const f of forecast.futureForecast || []) {
-            forecastChartData.push({ date: f.date, predicted: f.predicted });
-        }
-    }
+          >
+            <p className="mb-4 text-xs" style={{ color: "#6E7681" }}>
+              Ranked by aggregate sales across the entire dataset
+            </p>
+            {data ? (
+              <DrugSalesBarChart data={data.charts.topDrugs} />
+            ) : (
+              <ChartSkeleton height="h-64" />
+            )}
+          </SectionCard>
 
-    return (
-        <>
-            <style>{`
-                @keyframes spin { to { transform: rotate(360deg); } }
-                @keyframes dashboardEnter { from { opacity: 1; } to { opacity: 0; } }
-                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-                .drug-row:hover { background: rgba(255,0,0,0.06) !important; }
-                .insight-card:hover { border-color: rgba(255,0,0,0.3) !important; }
-            `}</style>
+          {/* Monthly seasonality */}
+          <SectionCard
+            title="Seasonal Distribution"
+            subtitle="Monthly Avg · Jan–Dec"
+            accentColor="#58A6FF"
+          >
+            <p className="mb-4 text-xs" style={{ color: "#6E7681" }}>
+              Average total sales per calendar month (seasonality pattern)
+            </p>
+            {data ? (
+              <MonthlyDistributionChart data={data.charts.monthly} />
+            ) : (
+              <ChartSkeleton height="h-48" />
+            )}
 
-            <PageEnterOverlay />
-            <Navbar title="Dashboard" subtitle="Real-time ML-powered pharmaceutical demand analytics" />
-
-            <div style={{ minHeight: "100%", background: "#000" }}>
-                <div style={{ border: "1px solid rgba(255,255,255,0.1)", background: "#000" }}>
-
-                    {/* ── Row 1: KPI Cards (Accuracy, Precision, Recall, F1) ── */}
-                    <section style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
-                            <KPICard
-                                label="Accuracy"
-                                value={kpi?.accuracy ?? 0}
-                                sublabel="XGBoost classification accuracy"
-                                delay={100}
-                                color="#34D399"
-                            />
-                            <KPICard
-                                label="Precision"
-                                value={kpi?.precision ?? 0}
-                                sublabel="Weighted precision score"
-                                delay={220}
-                                color="#60A5FA"
-                            />
-                            <KPICard
-                                label="Recall"
-                                value={kpi?.recall ?? 0}
-                                sublabel="Weighted recall score"
-                                delay={340}
-                                color="#C084FC"
-                            />
-                            <KPICard
-                                label="F1 Score"
-                                value={kpi?.f1 ?? 0}
-                                sublabel="Harmonic mean of precision & recall"
-                                delay={460}
-                                color="#FBBF24"
-                            />
-                        </div>
-                    </section>
-
-                    {/* ── Row 2: LSTM Forecast Chart + Demand Distribution ── */}
-                    <FadeSection delay={500} style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "8fr 4fr" }}>
-                            {/* LSTM Forecast Chart */}
-                            <div style={{ padding: "1.5rem 2rem", borderRight: "1px solid rgba(255,255,255,0.1)" }}>
-                                <SectionHeader
-                                    title="LSTM Demand Forecast"
-                                    subtitle="Historical sales vs LSTM predicted demand (past + future)"
-                                />
-                                <div style={{ height: 300 }}>
-                                    {forecastChartData.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={chartAnimating ? forecastChartData : []}>
-                                                <defs>
-                                                    <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#60A5FA" stopOpacity={0.3} />
-                                                        <stop offset="95%" stopColor="#60A5FA" stopOpacity={0} />
-                                                    </linearGradient>
-                                                    <linearGradient id="gradPredicted" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#FF0000" stopOpacity={0.35} />
-                                                        <stop offset="95%" stopColor="#FF0000" stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                                                <XAxis
-                                                    dataKey="date"
-                                                    tick={{ fontSize: 10, fill: "#808080" }}
-                                                    tickFormatter={(v) => v.slice(5)}
-                                                    axisLine={false}
-                                                    tickLine={false}
-                                                />
-                                                <YAxis tick={{ fontSize: 10, fill: "#808080" }} axisLine={false} tickLine={false} />
-                                                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="actual"
-                                                    stroke="#60A5FA"
-                                                    strokeWidth={2}
-                                                    fill="url(#gradActual)"
-                                                    name="Actual Sales"
-                                                    isAnimationActive={chartAnimating}
-                                                    animationDuration={1800}
-                                                    animationEasing="ease-out"
-                                                    connectNulls={false}
-                                                />
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="predicted"
-                                                    stroke="#FF0000"
-                                                    strokeWidth={2.5}
-                                                    fill="url(#gradPredicted)"
-                                                    name="LSTM Predicted"
-                                                    strokeDasharray="6 3"
-                                                    isAnimationActive={chartAnimating}
-                                                    animationDuration={2200}
-                                                    animationEasing="ease-out"
-                                                    connectNulls={false}
-                                                />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    ) : (
-                                        <div style={{
-                                            height: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-                                            border: "1px solid rgba(255,255,255,0.08)", color: "rgba(191,191,191,0.6)", fontSize: "0.85rem",
-                                        }}>
-                                            No forecast data available
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Legend */}
-                                <div style={{ display: "flex", gap: 20, marginTop: 12 }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                        <div style={{ width: 16, height: 3, background: "#60A5FA", borderRadius: 2 }} />
-                                        <span style={{ fontSize: "0.72rem", color: "rgba(191,191,191,0.8)" }}>Historical</span>
-                                    </div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                        <div style={{ width: 16, height: 3, background: "#FF0000", borderRadius: 2 }} />
-                                        <span style={{ fontSize: "0.72rem", color: "rgba(191,191,191,0.8)" }}>LSTM Forecast</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Demand Distribution */}
-                            <div style={{ padding: "1.5rem" }}>
-                                <SectionHeader
-                                    title="Prediction Distribution"
-                                    subtitle="XGBoost demand classification"
-                                />
-                                {demandDist.length > 0 ? (
-                                    <>
-                                        <div style={{ height: 200, display: "flex", justifyContent: "center" }}>
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={demandDist}
-                                                        dataKey="count"
-                                                        nameKey="label"
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={50}
-                                                        outerRadius={80}
-                                                        paddingAngle={3}
-                                                        isAnimationActive={chartAnimating}
-                                                        animationDuration={1200}
-                                                    >
-                                                        {demandDist.map((entry) => (
-                                                            <Cell
-                                                                key={entry.label}
-                                                                fill={DEMAND_COLORS[entry.label] || "#6E7681"}
-                                                                stroke="rgba(0,0,0,0.3)"
-                                                                strokeWidth={2}
-                                                            />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        {/* Legend items */}
-                                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-                                            {demandDist.map((d) => (
-                                                <div key={d.label} style={{
-                                                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                                                    padding: "8px 12px",
-                                                    border: "1px solid rgba(255,255,255,0.08)",
-                                                    background: "rgba(255,255,255,0.02)",
-                                                }}>
-                                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                        <div style={{
-                                                            width: 10, height: 10, borderRadius: "50%",
-                                                            background: DEMAND_COLORS[d.label] || "#6E7681",
-                                                        }} />
-                                                        <span style={{ fontSize: "0.82rem", color: "#fff" }}>
-                                                            {d.label} Demand
-                                                        </span>
-                                                    </div>
-                                                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#fff" }}>
-                                                        {d.count.toLocaleString()}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div style={{
-                                        height: 200, display: "flex", alignItems: "center", justifyContent: "center",
-                                        border: "1px solid rgba(255,255,255,0.08)", color: "rgba(191,191,191,0.6)", fontSize: "0.85rem",
-                                    }}>
-                                        No distribution data
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </FadeSection>
-
-                    {/* ── Row 3: Feature Importance + Top Products ── */}
-                    <FadeSection delay={700} style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "7fr 5fr" }}>
-                            {/* Feature Importance */}
-                            <div style={{ padding: "1.5rem 2rem", borderRight: "1px solid rgba(255,255,255,0.1)" }}>
-                                <SectionHeader
-                                    title="Feature Importance"
-                                    subtitle="XGBoost model — which features drive demand predictions"
-                                />
-                                {importance.length > 0 ? (
-                                    <div style={{ height: 280 }}>
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart
-                                                data={importance.slice(0, 10)}
-                                                layout="vertical"
-                                                margin={{ left: 100, right: 20 }}
-                                            >
-                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" horizontal={false} />
-                                                <XAxis
-                                                    type="number"
-                                                    tick={{ fontSize: 10, fill: "#808080" }}
-                                                    axisLine={false}
-                                                    tickLine={false}
-                                                />
-                                                <YAxis
-                                                    type="category"
-                                                    dataKey="feature"
-                                                    tick={{ fontSize: 11, fill: "#BFBFBF" }}
-                                                    axisLine={false}
-                                                    tickLine={false}
-                                                    width={95}
-                                                />
-                                                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                                                <Bar
-                                                    dataKey="importance"
-                                                    name="Importance"
-                                                    radius={[0, 4, 4, 0]}
-                                                    isAnimationActive={chartAnimating}
-                                                    animationDuration={1400}
-                                                >
-                                                    {importance.slice(0, 10).map((_, idx) => (
-                                                        <Cell
-                                                            key={idx}
-                                                            fill={`rgba(255, ${Math.max(0, 77 - idx * 8)}, ${Math.max(0, 77 - idx * 8)}, ${1 - idx * 0.08})`}
-                                                        />
-                                                    ))}
-                                                </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                ) : (
-                                    <div style={{
-                                        height: 200, display: "flex", alignItems: "center", justifyContent: "center",
-                                        border: "1px solid rgba(255,255,255,0.08)", color: "rgba(191,191,191,0.6)", fontSize: "0.85rem",
-                                    }}>
-                                        No feature importance data
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Top Products */}
-                            <div style={{ padding: "1.5rem" }}>
-                                <SectionHeader
-                                    title="Top Products"
-                                    subtitle="Highest demand from your dataset"
-                                />
-                                <div style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
-                                    {topDrugs.length > 0 ? topDrugs.map((drug, i) => (
-                                        <div
-                                            key={drug.name}
-                                            className="drug-row"
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 12,
-                                                padding: "12px 14px",
-                                                borderBottom: i < topDrugs.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
-                                                background: "transparent",
-                                                transition: "background 0.2s ease",
-                                                opacity: 0,
-                                                animation: `slideUp 0.4s ease-out ${0.8 + i * 0.1}s forwards`,
-                                                cursor: "default",
-                                            }}
-                                        >
-                                            <span style={{
-                                                width: 28, height: 28, flexShrink: 0,
-                                                display: "flex", alignItems: "center", justifyContent: "center",
-                                                fontSize: "0.72rem", fontWeight: 700,
-                                                border: "1px solid rgba(255,0,0,0.3)",
-                                                background: "rgba(255,0,0,0.12)",
-                                                color: "#fff",
-                                            }}>{i + 1}</span>
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <p style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                    {drug.name}
-                                                </p>
-                                                <p style={{ fontSize: "0.72rem", color: "rgba(191,191,191,1)" }}>
-                                                    Avg: {drug.avgDemand} units/day
-                                                </p>
-                                            </div>
-                                            <div style={{ textAlign: "right", flexShrink: 0 }}>
-                                                <p style={{ fontSize: "0.82rem", fontWeight: 700, color: "#fff" }}>
-                                                    {drug.totalDemand.toLocaleString()}
-                                                </p>
-                                                <p style={{
-                                                    fontSize: "0.72rem", fontWeight: 600,
-                                                    color: drug.changePercent > 0 ? "#34D399" : drug.changePercent < 0 ? "#F85149" : "rgba(191,191,191,1)",
-                                                }}>
-                                                    {drug.changePercent > 0 ? "↑" : drug.changePercent < 0 ? "↓" : "→"} {drug.changePercent > 0 ? "+" : ""}{drug.changePercent}%
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )) : (
-                                        <div style={{
-                                            padding: 24, textAlign: "center",
-                                            color: "rgba(191,191,191,0.6)", fontSize: "0.85rem",
-                                        }}>
-                                            No product data
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </FadeSection>
-
-                    {/* ── Row 4: Pharma Insights ── */}
-                    <FadeSection delay={900} style={{ padding: "1.5rem 2rem" }}>
-                        <SectionHeader
-                            title="AI-Powered Pharma Insights"
-                            subtitle="Actionable recommendations from model predictions"
-                        />
-                        {insights.length > 0 ? (
-                            <div style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-                                gap: 12,
-                            }}>
-                                {insights.map((ins, idx) => {
-                                    const severityColor =
-                                        ins.severity === "critical" ? "#FF0000" :
-                                        ins.severity === "high" ? "#F85149" :
-                                        ins.severity === "medium" ? "#FBBF24" : "#34D399";
-                                    const severityBg =
-                                        ins.severity === "critical" ? "rgba(255,0,0,0.08)" :
-                                        ins.severity === "high" ? "rgba(248,81,73,0.08)" :
-                                        ins.severity === "medium" ? "rgba(251,191,36,0.06)" : "rgba(52,211,153,0.06)";
-
-                                    return (
-                                        <div
-                                            key={idx}
-                                            className="insight-card"
-                                            style={{
-                                                padding: "16px 18px",
-                                                border: `1px solid rgba(255,255,255,0.1)`,
-                                                borderLeft: `3px solid ${severityColor}`,
-                                                background: severityBg,
-                                                opacity: 0,
-                                                animation: `slideUp 0.4s ease-out ${1.0 + idx * 0.08}s forwards`,
-                                                transition: "border-color 0.2s ease",
-                                            }}
-                                        >
-                                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                                                <span style={{
-                                                    width: 8, height: 8, borderRadius: "50%",
-                                                    background: severityColor, flexShrink: 0,
-                                                }} />
-                                                <p style={{
-                                                    fontSize: "0.72rem", textTransform: "uppercase",
-                                                    letterSpacing: "0.08em", color: severityColor,
-                                                    fontWeight: 700,
-                                                }}>
-                                                    {ins.type.replace(/_/g, " ")}
-                                                </p>
-                                            </div>
-                                            <p style={{ fontSize: "0.88rem", fontWeight: 600, color: "#fff", marginBottom: 6, lineHeight: 1.3 }}>
-                                                {ins.title}
-                                            </p>
-                                            <p style={{ fontSize: "0.78rem", color: "rgba(191,191,191,1)", lineHeight: 1.5 }}>
-                                                {ins.message}
-                                            </p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div style={{
-                                border: "1px solid rgba(255,255,255,0.08)",
-                                padding: 24, textAlign: "center",
-                                color: "rgba(191,191,191,0.6)", fontSize: "0.85rem",
-                            }}>
-                                Upload and process data to generate insights
-                            </div>
-                        )}
-                    </FadeSection>
-
-                    {/* ── Row 5: Model Comparison (if RF available) ── */}
-                    {dashboard?.rfMetrics && (
-                        <FadeSection delay={1100} style={{ borderTop: "1px solid rgba(255,255,255,0.1)", padding: "1.5rem 2rem" }}>
-                            <SectionHeader
-                                title="Model Comparison"
-                                subtitle="XGBoost vs Random Forest classification performance"
-                            />
-                            <div style={{
-                                display: "grid", gridTemplateColumns: "1fr 1fr",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                            }}>
-                                {/* XGBoost */}
-                                <div style={{ padding: "1.25rem", borderRight: "1px solid rgba(255,255,255,0.08)" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                                        <div style={{
-                                            padding: "4px 10px", fontSize: "0.68rem", fontWeight: 700,
-                                            background: "rgba(255,0,0,0.15)", color: "#F85149",
-                                            letterSpacing: "0.1em", textTransform: "uppercase",
-                                        }}>XGBoost</div>
-                                    </div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                                        {[
-                                            { l: "Accuracy", v: kpi?.accuracy },
-                                            { l: "Precision", v: kpi?.precision },
-                                            { l: "Recall", v: kpi?.recall },
-                                            { l: "F1", v: kpi?.f1 },
-                                        ].map((m) => (
-                                            <div key={m.l}>
-                                                <p style={{ fontSize: "0.68rem", color: "rgba(191,191,191,0.7)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{m.l}</p>
-                                                <p style={{ fontSize: "1.2rem", fontWeight: 700, color: "#fff", marginTop: 4 }}>{m.v?.toFixed(1)}%</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                {/* Random Forest */}
-                                <div style={{ padding: "1.25rem" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                                        <div style={{
-                                            padding: "4px 10px", fontSize: "0.68rem", fontWeight: 700,
-                                            background: "rgba(96,165,250,0.15)", color: "#60A5FA",
-                                            letterSpacing: "0.1em", textTransform: "uppercase",
-                                        }}>Random Forest</div>
-                                    </div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                                        {[
-                                            { l: "Accuracy", v: dashboard.rfMetrics?.accuracy },
-                                            { l: "Precision", v: dashboard.rfMetrics?.precision },
-                                            { l: "Recall", v: dashboard.rfMetrics?.recall },
-                                            { l: "F1", v: dashboard.rfMetrics?.f1 },
-                                        ].map((m) => (
-                                            <div key={m.l}>
-                                                <p style={{ fontSize: "0.68rem", color: "rgba(191,191,191,0.7)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{m.l}</p>
-                                                <p style={{ fontSize: "1.2rem", fontWeight: 700, color: "#fff", marginTop: 4 }}>{m.v?.toFixed(1)}%</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </FadeSection>
-                    )}
+            {/* Peak / Low markers */}
+            {data && peakMonth && lowestMonth && (
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-xl p-3 text-center" style={{
+                  background: "rgba(218,54,51,0.06)",
+                  border: "1px solid rgba(218,54,51,0.18)",
+                }}>
+                  <p className="text-[10px] uppercase tracking-wider" style={{ color: "#6E7681" }}>Peak Month</p>
+                  <p className="mt-1 text-sm font-semibold" style={{ color: "#F87171" }}>{peakMonth.month}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "#6E7681" }}>
+                    {peakMonth.avgSales.toLocaleString(undefined, { maximumFractionDigits: 0 })} avg
+                  </p>
                 </div>
+                <div className="rounded-xl p-3 text-center" style={{
+                  background: "rgba(88,166,255,0.06)",
+                  border: "1px solid rgba(88,166,255,0.18)",
+                }}>
+                  <p className="text-[10px] uppercase tracking-wider" style={{ color: "#6E7681" }}>Lowest Month</p>
+                  <p className="mt-1 text-sm font-semibold" style={{ color: "#58A6FF" }}>{lowestMonth.month}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "#6E7681" }}>
+                    {lowestMonth.avgSales.toLocaleString(undefined, { maximumFractionDigits: 0 })} avg
+                  </p>
+                </div>
+              </div>
+            )}
+          </SectionCard>
+        </div>
+
+        {/* ── EDA Insights Panel ── */}
+        {data && (
+          <div className="chart-card relative overflow-hidden p-6">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
+              style={{ background: "linear-gradient(90deg, #F78166 0%, transparent 70%)" }}
+            />
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: "#6E7681" }}>
+                  Dataset Insights
+                </p>
+                <h2 className="text-[15px] font-semibold" style={{ color: "#E6EDF3" }}>EDA Summary</h2>
+              </div>
+              <span className="rounded-full px-3 py-1 text-xs font-medium" style={{
+                background: "rgba(63,185,80,0.08)",
+                border: "1px solid rgba(63,185,80,0.2)",
+                color: "#3FB950",
+              }}>
+                Live Data
+              </span>
             </div>
-        </>
-    );
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <InsightPill
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                label="Dataset Months" value={`${data.meta.months} months`} color="#DA3633"
+              />
+              <InsightPill
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" /></svg>}
+                label="Date Range" value={`${data.meta.dateRange.from} – ${data.meta.dateRange.to}`} color="#58A6FF"
+              />
+              <InsightPill
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M18 2H6v7a6 6 0 0 0 12 0V2Z" strokeLinecap="round" /></svg>}
+                label="Top Drug Class" value={data.kpis.topDrug} color="#F78166"
+              />
+              <InsightPill
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" strokeLinecap="round" /></svg>}
+                label="Drug Categories" value={`${data.kpis.totalDrugs} ATC classes`} color="#A78BFA"
+              />
+              <InsightPill
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4"><path d="M12 20V10M18 20V4M6 20v-4" strokeLinecap="round" /></svg>}
+                label="Peak Season" value={peakMonth ? `${peakMonth.month} (highest avg)` : "—"} color="#3FB950"
+              />
+              <InsightPill
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" strokeLinecap="round" /></svg>}
+                label="Avg Monthly Sales" value={data.kpis.avgMonthlySales.toLocaleString(undefined, { maximumFractionDigits: 0 })} color="#FBBF24"
+              />
+            </div>
+
+            {/* EDA narrative */}
+            <div className="mt-5 rounded-xl p-4" style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.06)",
+            }}>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "#6E7681" }}>
+                Dataset Overview
+              </p>
+              <ul className="space-y-2.5 text-sm" style={{ color: "#8B949E" }}>
+                <li className="flex items-start gap-2.5">
+                  <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#DA3633" }} />
+                  <span>
+                    <strong style={{ color: "#E6EDF3" }}>{data.kpis.topDrug}</strong> dominates total
+                    volume with the highest aggregate sales across all {data.meta.months} months.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#58A6FF" }} />
+                  <span>
+                    Sales peak in <strong style={{ color: "#E6EDF3" }}>{peakMonth?.month}</strong> and
+                    are lowest in <strong style={{ color: "#E6EDF3" }}>{lowestMonth?.month}</strong>,
+                    indicating clear seasonal demand patterns.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#3FB950" }} />
+                  <span>
+                    Average monthly combined sales across all drug classes:{" "}
+                    <strong style={{ color: "#E6EDF3" }}>
+                      {data.kpis.avgMonthlySales.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </strong>{" "}
+                    units.
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </main>
+    </>
+  );
 }

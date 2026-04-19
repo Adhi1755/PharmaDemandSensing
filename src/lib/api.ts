@@ -1,6 +1,14 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
 
-async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+// ─── Standardised response envelope ──────────────────────────
+
+export interface ApiResponse<T> {
+    status: "success" | "failed" | "fallback";
+    data: T;
+    message: string;
+}
+
+async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
     const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
     const mergedHeaders = isFormData
         ? { ...(options?.headers || {}) }
@@ -10,11 +18,29 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
         headers: mergedHeaders,
         ...options,
     });
-    if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Request failed with status ${res.status}`);
+
+    const json = await res.json().catch(() => ({}));
+
+    // Handle both old-style (direct data) and new-style (envelope) responses
+    if ("status" in json && "data" in json) {
+        // New standardised envelope
+        if (!res.ok && json.status === "failed") {
+            throw new Error(json.message || `Request failed with status ${res.status}`);
+        }
+        return json as ApiResponse<T>;
     }
-    return res.json();
+
+    // Legacy response — wrap it
+    if (!res.ok) {
+        throw new Error(json.error || `Request failed with status ${res.status}`);
+    }
+    return { status: "success", data: json as T, message: "" };
+}
+
+/** Unwrap an ApiResponse, returning just the data (for simpler call sites). */
+async function fetchData<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    const res = await fetchAPI<T>(endpoint, options);
+    return res.data;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────
@@ -27,13 +53,13 @@ export interface AuthUser {
 }
 
 export const login = (email: string, password: string) =>
-    fetchAPI<{ message: string; user: AuthUser }>("/api/login", {
+    fetchData<{ message: string; user: AuthUser }>("/api/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
     });
 
 export const signup = (name: string, email: string, password: string) =>
-    fetchAPI<{ message: string; user: AuthUser }>("/api/signup", {
+    fetchData<{ message: string; user: AuthUser }>("/api/signup", {
         method: "POST",
         body: JSON.stringify({ name, email, password }),
     });
@@ -48,7 +74,7 @@ export const saveUserDetails = (payload: {
     state: string;
     pharmacyType?: string;
 }) =>
-    fetchAPI<{ message: string }>("/api/user-details", {
+    fetchData<{ message: string }>("/api/user-details", {
         method: "POST",
         body: JSON.stringify(payload),
     });
@@ -58,7 +84,7 @@ export const uploadDataset = async (email: string, file: File) => {
     formData.append("email", email);
     formData.append("file", file);
 
-    return fetchAPI<{
+    return fetchData<{
         message: string;
         fileName: string;
         rows: number;
@@ -71,7 +97,7 @@ export const uploadDataset = async (email: string, file: File) => {
 };
 
 export const getPreviewData = (email: string) =>
-    fetchAPI<{ preview: Record<string, string | number | null>[]; columns: string[] }>(
+    fetchData<{ preview: Record<string, string | number | null>[]; columns: string[] }>(
         `/api/preview-data?email=${encodeURIComponent(email)}`
     );
 
@@ -82,7 +108,7 @@ export const processData = (payload: {
     drugColumn: string;
     locationColumn?: string;
 }) =>
-    fetchAPI<{ message: string; processedRows: number; featureColumns: string[] }>("/api/process-data", {
+    fetchData<{ message: string; processedRows: number; featureColumns: string[] }>("/api/process-data", {
         method: "POST",
         body: JSON.stringify(payload),
     });
@@ -91,12 +117,16 @@ export const processData = (payload: {
 
 export interface PredictionResult {
     xgboost: {
+        train_accuracy: number;
+        test_accuracy: number;
         accuracy: number;
         precision: number;
         recall: number;
         f1: number;
     };
     randomForest: {
+        train_accuracy: number;
+        test_accuracy: number;
         accuracy: number;
         precision: number;
         recall: number;
@@ -128,6 +158,9 @@ export interface ForecastResult {
     futureForecast: { date: string; predicted: number }[];
     horizon: number;
     totalHistorical: number;
+    model?: "lstm" | "fallback";
+    accuracy?: number | null;
+    message?: string;
 }
 
 export const forecastDemand = (email: string, horizon: number = 14) =>
@@ -138,19 +171,15 @@ export const forecastDemand = (email: string, horizon: number = 14) =>
 
 // ─── Dashboard ────────────────────────────────────────────────
 
+export interface DashboardKpis {
+    totalSales: number;
+    forecastedSales: number;
+    modelAccuracy: number;
+}
+
 export interface DashboardFull {
-    kpi: {
-        accuracy: number;
-        precision: number;
-        recall: number;
-        f1: number;
-    };
-    rfMetrics: {
-        accuracy: number;
-        precision: number;
-        recall: number;
-        f1: number;
-    } | null;
+    kpis: DashboardKpis;
+    forecast: ForecastResult;
     demandDistribution: { label: string; count: number }[];
     featureImportance: { feature: string; importance: number }[];
     insights: {
@@ -159,22 +188,15 @@ export interface DashboardFull {
         message: string;
         severity: string;
     }[];
-    forecast: ForecastResult;
     totalSamples: number;
-    demandThresholds: { low: number; high: number };
+    demandThresholds?: { low: number; high: number };
 }
 
 export const getDashboardFull = (email: string) =>
     fetchAPI<DashboardFull>(`/api/dashboard-full?email=${encodeURIComponent(email)}`);
 
 export const getDashboardStats = (email: string) =>
-    fetchAPI<{
-        accuracy: number;
-        precision: number;
-        recall: number;
-        f1: number;
-        totalSamples: number;
-    }>(`/api/dashboard-stats?email=${encodeURIComponent(email)}`);
+    fetchAPI<DashboardKpis>(`/api/dashboard-stats?email=${encodeURIComponent(email)}`);
 
 export const getTopDrugs = (email: string) =>
     fetchAPI<
@@ -209,6 +231,8 @@ export const getModelMetrics = (email: string) =>
         models: {
             name: string;
             shortName: string;
+            train_accuracy?: number;
+            test_accuracy?: number;
             accuracy: number;
             precision: number;
             recall: number;
@@ -226,3 +250,40 @@ export const getInsights = (email: string) =>
             severity: string;
         }[]
     >(`/api/insights?email=${encodeURIComponent(email)}`);
+
+// ─── Dataset Comparison ──────────────────────────────────────
+
+export type DatasetKey = "raw" | "processed";
+
+export interface DatasetComparisonRow {
+    id: string;
+    date: string;
+    category: string;
+    stock: number;
+    demand: number;
+    price: number;
+    metricA: number;
+    metricB: number;
+    metricC: number;
+}
+
+export interface DatasetComparisonStats {
+    rowsCount: number;
+    featuresCount: number;
+    missingCount: number;
+    missingLabel: "None" | "Low" | "Medium" | "High";
+    cleanlinessStatus: string;
+}
+
+export interface DatasetComparisonPayload {
+    raw: {
+        columns: string[];
+        rows: DatasetComparisonRow[];
+        stats: DatasetComparisonStats;
+    };
+    processed: {
+        columns: string[];
+        rows: DatasetComparisonRow[];
+        stats: DatasetComparisonStats;
+    };
+}

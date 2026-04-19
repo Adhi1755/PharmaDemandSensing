@@ -21,13 +21,13 @@ The current implementation is demo-ready and uses sample datasets so teams can e
 - Inventory tracking with safety-stock comparison and reorder recommendations.
 - Model performance visibility through forecasting metrics and feature importance.
 - Insight feeds for trend anomalies, intermittent demand behavior, and regional demand views.
-- Authentication flows for signup and login (in-memory for development).
+- Authentication flows for signup, login, and profile refresh backed by SQLite.
 
 ## Tech Stack
 
 - Frontend: Next.js 16, React 19, TypeScript, Tailwind CSS 4, Recharts, GSAP
 - Backend: Flask 3, Flask-CORS
-- Data: In-memory sample data for dashboard, forecasting, inventory, and insights endpoints
+- Data: SQLite-backed user auth/profile store plus in-memory sample data for dashboard, forecasting, inventory, and insights endpoints
 
 ## Project Structure
 
@@ -118,6 +118,20 @@ npm run lint   # Run ESLint
 
 - `POST /api/signup`
 - `POST /api/login`
+- `GET /api/me?email=<email>`
+
+### Onboarding / Sales Pipeline
+
+- `POST /api/user-details`
+- `POST /api/upload-dataset` (auto-runs: clean -> feature engineering -> encode -> scale -> train -> persist artifacts -> decoded predictions)
+- `GET /api/preview-data?email=<email>`
+- `POST /api/process-data` (legacy/manual preprocessing flow)
+
+### Predictions
+
+- `POST /api/predict` (classification metrics + insights)
+- `POST /api/predict-sales` (decoded medicine-level regression predictions)
+- `POST /api/forecast` (time-series forecast)
 
 ### Dashboard
 
@@ -145,8 +159,9 @@ npm run lint   # Run ESLint
 
 ## Notes
 
-- Authentication uses an in-memory user store in `backend/routes/auth.py`.
-- All backend responses are demo/sample driven and reset when the backend restarts.
+- Authentication uses a SQLite database in `backend/data/pharmasens.sqlite3`.
+- Passwords are hashed with PBKDF2-SHA256 before storage.
+- All backend responses except user auth/profile are demo/sample driven and reset when the backend restarts.
 - CORS is enabled for local frontend development.
 
 ## Troubleshooting

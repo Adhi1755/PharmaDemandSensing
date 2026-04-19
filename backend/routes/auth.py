@@ -1,6 +1,8 @@
-from flask import Blueprint, request, jsonify
+import sqlite3
 
-from data.store import users_db, store_lock
+from flask import Blueprint, jsonify, request
+
+from data.auth_db import authenticate_user, create_user, get_user
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -15,30 +17,23 @@ def signup():
     if not name or not email or not password:
         return jsonify({"error": "All fields are required"}), 400
 
-    with store_lock:
-        if email in users_db:
-            return jsonify({"error": "Email already registered"}), 409
-
     if len(password) < 6:
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
-    with store_lock:
-        users_db[email] = {
-            "name": name,
-            "email": email,
-            "password": password,
-            "isNewUser": True,
-            "hasUploadedData": False,
-            "profile": None,
-        }
+    try:
+        user = create_user(name=name, email=email, password=password)
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "Email already registered"}), 409
+    except Exception as exc:
+        return jsonify({"error": f"Unable to create account: {exc}"}), 500
 
     return jsonify({
         "message": "Account created successfully",
         "user": {
-            "name": name,
-            "email": email,
-            "isNewUser": True,
-            "hasUploadedData": False,
+            "name": user["name"],
+            "email": user["email"],
+            "isNewUser": user["isNewUser"],
+            "hasUploadedData": user["hasUploadedData"],
         },
     }), 201
 
@@ -52,10 +47,8 @@ def login():
     if not email or not password:
         return jsonify({"error": "Email and password are required"}), 400
 
-    with store_lock:
-        user = users_db.get(email)
-
-    if not user or user["password"] != password:
+    user = authenticate_user(email, password)
+    if not user:
         return jsonify({"error": "Invalid email or password"}), 401
 
     return jsonify({
@@ -63,7 +56,28 @@ def login():
         "user": {
             "name": user["name"],
             "email": user["email"],
-            "isNewUser": user.get("isNewUser", True),
-            "hasUploadedData": user.get("hasUploadedData", False),
+            "isNewUser": user["isNewUser"],
+            "hasUploadedData": user["hasUploadedData"],
+        },
+    }), 200
+
+
+@auth_bp.route("/api/me", methods=["GET"])
+def me():
+    email = request.args.get("email", "").strip().lower()
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    user = get_user(email)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    return jsonify({
+        "user": {
+            "name": user["name"],
+            "email": user["email"],
+            "isNewUser": user["isNewUser"],
+            "hasUploadedData": user["hasUploadedData"],
+            "profile": user["profile"],
         },
     }), 200

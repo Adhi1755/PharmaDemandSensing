@@ -1,10 +1,13 @@
+import os
 import io
 import numpy as np
 import pandas as pd
 from flask import Blueprint, jsonify, request
 from sklearn.preprocessing import LabelEncoder
 
-from data.store import datasets_db, store_lock, users_db
+from data.auth_db import get_user, mark_user_uploaded, update_user_details
+from data.store import datasets_db, model_state_db, store_lock
+from pipeline.sales_pipeline import run_training_pipeline
 
 onboarding_bp = Blueprint("onboarding", __name__)
 
@@ -29,8 +32,7 @@ def _get_email_from_request():
 def _require_user(email):
     if not email:
         return None, (jsonify({"error": "Email is required"}), 400)
-    with store_lock:
-        user = users_db.get(email)
+    user = get_user(email)
     if not user:
         return None, (jsonify({"error": "User not found"}), 404)
     return user, None
@@ -51,6 +53,12 @@ def _read_uploaded_file(file_storage):
     content = file_storage.read()
     file_storage.stream.seek(0)
     return pd.read_excel(io.BytesIO(content))
+
+
+def _artifact_root_path() -> str:
+    return os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "models", "user_artifacts")
+    )
 
 
 def _preprocess_dataframe(df, columns):
@@ -148,15 +156,14 @@ def save_user_details():
     if not full_name or not company_name or not city or not state:
         return jsonify({"error": "Full name, company, city, and state are required"}), 400
 
-    with store_lock:
-        users_db[email]["name"] = full_name
-        users_db[email]["profile"] = {
-            "fullName": full_name,
-            "companyName": company_name,
-            "city": city,
-            "state": state,
-            "pharmacyType": pharmacy_type,
-        }
+    update_user_details(
+        email,
+        full_name=full_name,
+        company_name=company_name,
+        city=city,
+        state=state,
+        pharmacy_type=pharmacy_type,
+    )
 
     return jsonify({"message": "User details saved"}), 200
 
@@ -167,6 +174,7 @@ def upload_dataset():
     _, error = _require_user(email)
     if error:
         return error
+    email = str(email)
 
     if "file" not in request.files:
         return jsonify({"error": "Dataset file is required"}), 400
@@ -188,15 +196,78 @@ def upload_dataset():
     preview = df.head(5).fillna("").to_dict(orient="records")
     columns = [str(col) for col in df.columns]
 
-    with store_lock:
-        datasets_db[email] = {
-            "raw": df,
-            "preview": preview,
-            "columns": columns,
-            "processed": None,
-            "label_encoder": None,
-            "selected_columns": None,
+    pipeline_payload = {
+        "trained": False,
+        "metrics": {},
+        "featureColumns": [],
+        "predictions": [],
+        "error": None,
+    }
+
+    try:
+        processed_df, artifacts, decoded_predictions = run_training_pipeline(
+            raw_df=df,
+            user_email=email,
+            artifact_root=_artifact_root_path(),
+        )
+
+        pipeline_processed = processed_df.copy()
+        pipeline_processed["quantity"] = pipeline_processed["sales"].astype(float)
+        pipeline_processed["category"] = pipeline_processed["medicine_name"].astype(str)
+
+        prediction_records = decoded_predictions.copy()
+        prediction_records["date"] = prediction_records["date"].dt.strftime("%Y-%m-%d")
+
+        with store_lock:
+            model_state_db[email] = model_state_db.get(email, {})
+            model_state_db[email]["sales_pipeline"] = {
+                "rf_model": artifacts.rf_model,
+                "xgb_model": artifacts.xgb_model,
+                "medicine_encoder": artifacts.medicine_encoder,
+                "category_encoder": artifacts.category_encoder,
+                "scaler": artifacts.scaler,
+                "feature_columns": artifacts.feature_columns,
+                "metrics": artifacts.metrics,
+                "artifact_paths": artifacts.artifact_paths,
+            }
+
+            datasets_db[email] = {
+                "raw": df,
+                "preview": preview,
+                "columns": columns,
+                "processed": pipeline_processed,
+                "label_encoder": artifacts.medicine_encoder,
+                "selected_columns": {
+                    "dateColumn": "date",
+                    "salesColumn": "sales",
+                    "drugColumn": "medicine_name",
+                    "locationColumn": None,
+                },
+                "pipeline_ready": True,
+                "pipeline_metrics": artifacts.metrics,
+            }
+
+        mark_user_uploaded(email)
+        pipeline_payload = {
+            "trained": True,
+            "metrics": artifacts.metrics,
+            "featureColumns": artifacts.feature_columns,
+            "predictions": prediction_records.head(200).to_dict(orient="records"),
+            "error": None,
         }
+
+    except Exception as exc:
+        with store_lock:
+            datasets_db[email] = {
+                "raw": df,
+                "preview": preview,
+                "columns": columns,
+                "processed": None,
+                "label_encoder": None,
+                "selected_columns": None,
+                "pipeline_ready": False,
+            }
+        pipeline_payload["error"] = str(exc)
 
     return jsonify({
         "message": "Dataset uploaded",
@@ -204,6 +275,7 @@ def upload_dataset():
         "rows": int(len(df)),
         "columns": columns,
         "preview": preview,
+        "pipeline": pipeline_payload,
     }), 200
 
 
@@ -277,8 +349,7 @@ def process_data():
             "locationColumn": location_col,
         }
         # Mark user as onboarded
-        users_db[email]["hasUploadedData"] = True
-        users_db[email]["isNewUser"] = False
+        mark_user_uploaded(email)
 
     return jsonify({
         "message": "Data successfully prepared",

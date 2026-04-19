@@ -233,13 +233,24 @@ function UploadOverlay({ visible, onComplete }: { visible: boolean; onComplete: 
     const [done, setDone] = useState(false);
 
     useEffect(() => {
-        if (!visible) { setCurrentStep(0); setProgress(0); setDone(false); return; }
+        if (!visible) return;
+
+        const resetFrame = requestAnimationFrame(() => {
+            setCurrentStep(0);
+            setProgress(0);
+            setDone(false);
+        });
         const totalMs = 3400;
         const stepMs = totalMs / UPLOAD_SUBSTEPS.length;
         const si = setInterval(() => setCurrentStep((p) => Math.min(p + 1, UPLOAD_SUBSTEPS.length - 1)), stepMs);
         const pi = setInterval(() => setProgress((p) => { if (p >= 100) { clearInterval(pi); return 100; } return p + 1; }), totalMs / 100);
         const t = setTimeout(() => { setDone(true); setTimeout(onComplete, 400); }, totalMs + 100);
-        return () => { clearInterval(si); clearInterval(pi); clearTimeout(t); };
+        return () => {
+            cancelAnimationFrame(resetFrame);
+            clearInterval(si);
+            clearInterval(pi);
+            clearTimeout(t);
+        };
     }, [visible, onComplete]);
 
     if (!visible) return null;
@@ -299,12 +310,21 @@ function PredictionOverlay({ visible }: { visible: boolean }) {
     const [progress, setProgress] = useState(0);
 
     useEffect(() => {
-        if (!visible) { setCurrentStep(0); setProgress(0); return; }
+        if (!visible) return;
+
+        const resetFrame = requestAnimationFrame(() => {
+            setCurrentStep(0);
+            setProgress(0);
+        });
         const totalMs = 8000;
         const stepMs = totalMs / PREDICTION_STEPS.length;
         const si = setInterval(() => setCurrentStep((p) => Math.min(p + 1, PREDICTION_STEPS.length - 1)), stepMs);
         const pi = setInterval(() => setProgress((p) => { if (p >= 98) { clearInterval(pi); return 98; } return p + 0.5; }), totalMs / 200);
-        return () => { clearInterval(si); clearInterval(pi); };
+        return () => {
+            cancelAnimationFrame(resetFrame);
+            clearInterval(si);
+            clearInterval(pi);
+        };
     }, [visible]);
 
     if (!visible) return null;
@@ -519,7 +539,7 @@ export default function OnboardingPage() {
             localStorage.removeItem(LOCAL_USER_KEY);
             routerRef.current.replace("/login");
         }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
     /* Fetch preview if navigating back */
     useEffect(() => {

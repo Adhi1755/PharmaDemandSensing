@@ -3,6 +3,7 @@ import logging
 from flask import Flask
 from flask_cors import CORS
 
+from data.auth_db import init_auth_db
 from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
 from routes.forecast import forecast_bp
@@ -26,6 +27,8 @@ def create_app():
     app.register_blueprint(insights_bp)
     app.register_blueprint(onboarding_bp)
     app.register_blueprint(predict_bp)
+
+    init_auth_db()
 
     @app.route("/api/health", methods=["GET"])
     def health():
