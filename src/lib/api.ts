@@ -1,4 +1,8 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+// Empty string = use relative URLs → Next.js rewrites in next.config.ts
+// proxy /api/* to the Flask backend (NEXT_PUBLIC_API_URL or http://localhost:5001).
+// This works whether the backend runs via Docker or `python3 app.py`.
+const API_BASE = "";
+
 
 // ─── Standardised response envelope ──────────────────────────
 

@@ -1,0 +1,37 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pharmasens-backend
+    ports:
+      - "5001:5001"
+    environment:
+      # Silence TF C++ output
+      TF_CPP_MIN_LOG_LEVEL: "3"
+      # Flask/Gunicorn port inside the container
+      PORT: "5001"
+      FLASK_ENV: development
+      # ── CRITICAL: point SQLite to the persistent volume mount ──
+      # Without this, the DB defaults to a path relative to auth_db.py
+      # which is wiped on every container rebuild.
+      PHARMASENS_SQLITE_PATH: /app/data/pharmasens.sqlite3
+      # ── CRITICAL: must use 1 worker ──
+      # datasets_db / prediction_db / model_state_db are in-memory Python
+      # dicts.  With >1 gunicorn worker each process has its own memory,
+      # so data uploaded by one request is invisible to the next worker.
+      GUNICORN_WORKERS: "1"
+    volumes:
+      # Persist the SQLite database (users / auth) across container restarts
+      - pharmasens_db:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s   # Give TF / model loading time to finish
+
+volumes:
+  pharmasens_db:
+    driver: local
