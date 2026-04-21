@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Navbar from "@/components/Navbar";
+
 import LoadingSpinner from "@/components/LoadingSpinner";
 import DataTable, { type DataTableColumn } from "@/components/dashboard/DataTable";
 import type {
@@ -245,7 +245,6 @@ export default function InventoryClient({ initialData }: { initialData: DatasetC
 
     return (
         <>
-            <Navbar title="Inventory Management" subtitle="Raw vs Processed Data Comparison" />
             <main data-page-main="true" className="space-y-6 p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
                 <section className="glass-card rounded-2xl p-5">
                     <h2 className="text-lg font-semibold text-(--color-light-gray)">Add New Row</h2>

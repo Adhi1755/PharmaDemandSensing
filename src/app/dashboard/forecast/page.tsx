@@ -1,6 +1,6 @@
 "use client";
 
-import Navbar from "@/components/Navbar";
+
 import ChartCard from "@/components/dashboard/ChartCard";
 import {
     CartesianGrid,
@@ -62,7 +62,6 @@ const TFT_SERIES: TimeSeriesPoint[] = Array.from({ length: TOTAL_POINTS }, (_, i
 export default function ForecastPage() {
     return (
         <>
-            <Navbar title="Forecast Analysis" subtitle="Static model output comparison: LSTM vs TFT" />
             <main data-page-main="true" className="space-y-6 p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
                 <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <article className="glass-card rounded-2xl p-5">

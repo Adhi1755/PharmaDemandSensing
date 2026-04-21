@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Navbar from "@/components/Navbar";
+
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ChartCard from "@/components/dashboard/ChartCard";
 import FeatureImportanceChart from "@/charts/FeatureImportanceChart";
@@ -148,7 +148,6 @@ export default function ModelsPage() {
 
     return (
         <>
-            <Navbar title="Models" subtitle="Technical ML performance and feature drivers" />
             <main data-page-main="true" className="space-y-6 p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
                 <section className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
                     {models.map((model) => (

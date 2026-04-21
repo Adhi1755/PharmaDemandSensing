@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Navbar from "@/components/Navbar";
+
 import { type AuthUser } from "@/lib/api";
 
 const LOCAL_USER_KEY = "pharmasens_user";
@@ -30,7 +30,6 @@ export default function ProfilePage() {
 
     return (
         <>
-            <Navbar title="Profile" subtitle="Manage account and organization settings" />
             <main data-page-main="true" className="space-y-6 p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
                 <section className="glass-card rounded-2xl p-5">
                     <h2 className="text-lg font-semibold text-(--color-light-gray)">User Profile</h2>

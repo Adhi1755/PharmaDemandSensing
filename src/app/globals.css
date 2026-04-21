@@ -196,16 +196,7 @@
     transform-origin: center;
   }
 
-  /* ── Sidebar states ── */
-  .sidebar-collapsed .group:hover .sidebar-tooltip { opacity: 1; }
-  .sidebar-expanded .sidebar-tooltip { opacity: 0 !important; }
-  .sidebar-collapsed .sidebar-header { padding-left: 0.75rem; padding-right: 0.75rem; }
-  .sidebar-expanded .sidebar-header { padding-left: 1.5rem; padding-right: 1.5rem; }
-  .sidebar-collapsed .sidebar-brand,
-  .sidebar-collapsed .sidebar-item { justify-content: center; }
-  .sidebar-expanded .sidebar-brand,
-  .sidebar-expanded .sidebar-item { justify-content: flex-start; }
-  .sidebar-expanded .sidebar-text { text-align: left; }
+  /* Sidebar state classes removed — layout now uses top navigation */
 
   /* ── Animations ── */
   .animate-fade-in { animation: fadeIn 0.5s ease-out; }
