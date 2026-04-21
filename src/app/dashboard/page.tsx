@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
 import EDAKPISection from "@/components/dashboard/EDAKPISection";
+import NotificationTray from "@/components/dashboard/NotificationTray";
+import ReorderPlanner from "@/components/dashboard/ReorderPlanner";
+import { computeAlerts } from "@/lib/alerts-engine";
+import type { AlertItem } from "@/lib/alerts-engine";
+import { buildInventoryRows } from "@/lib/dashboard-data";
+import type { InventoryRow } from "@/lib/dashboard-data";
 
 // ── Lazy-load charts ───────────────────────────────────────────
 const SalesTrendChart = dynamic(() => import("@/charts/SalesTrendChart"), {
@@ -114,11 +120,322 @@ function InsightPill({
   );
 }
 
+// ── Days-Left Cell ────────────────────────────────────────────
+function DaysLeftCell({ row }: { row: InventoryRow }) {
+  const d = row.daysUntilStockout;
+  const cls =
+    d <= 2 ? "days-cell-red" :
+    d <= 5 ? "days-cell-orange" :
+    d <= 10 ? "days-cell-yellow" :
+    "days-cell-green";
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-xs font-bold tabular-nums ${cls}`}
+      title={`At current sales rate of ${row.avgDailySales} units/day`}
+    >
+      {d}d
+    </span>
+  );
+}
+
+// ── Smart Reorder Cell ────────────────────────────────────────
+function SmartReorderCell({ row, isSimulated }: { row: InventoryRow; isSimulated: boolean }) {
+  if (isSimulated) {
+    return (
+      <span className="text-xs font-medium" style={{ color: "#3FB950" }}>
+        ✅ Order Placed
+      </span>
+    );
+  }
+
+  const { orderIn, orderBy } = row.reorderRecommendation;
+  const dateStr = new Date(orderBy).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+  if (orderIn <= 0) {
+    return (
+      <span className="text-xs font-bold" style={{ color: "#F85149" }}>
+        ⚠️ Order NOW
+      </span>
+    );
+  }
+  if (orderIn <= 3) {
+    return (
+      <span className="text-xs font-semibold" style={{ color: "#FBBF24" }}>
+        📅 Order in {orderIn}d — by {dateStr}
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs font-medium" style={{ color: "#3FB950" }}>
+      ✅ Order by {dateStr}
+    </span>
+  );
+}
+
+// ── Product Detail Stockout Bar ───────────────────────────────
+function StockoutBar({ days, max = 30 }: { days: number; max?: number }) {
+  const pct = Math.min(100, Math.round((days / max) * 100));
+  const fillColor =
+    days <= 2 ? "#F85149" :
+    days <= 5 ? "#F97316" :
+    days <= 10 ? "#FBBF24" :
+    "#3FB950";
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] uppercase tracking-wider" style={{ color: "#6E7681" }}>
+          Stock Runway
+        </span>
+        <span className="text-xs font-bold tabular-nums" style={{ color: fillColor }}>
+          {days} days
+        </span>
+      </div>
+      <div className="stockout-bar-track">
+        <div
+          className="stockout-bar-fill"
+          style={{ width: `${pct}%`, background: fillColor }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Inventory Table ───────────────────────────────────────────
+function InventoryTable({
+  rows,
+  simulatedOrders,
+}: {
+  rows: InventoryRow[];
+  simulatedOrders: Set<string>;
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 8;
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const visibleRows = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, safePage, pageSize]);
+
+  return (
+    <div className="overflow-hidden rounded-2xl border" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse" style={{ minWidth: "900px" }}>
+          <thead className="sticky top-0 z-10" style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(12px)" }}>
+            <tr>
+              {["Medicine", "Category", "Stock", "Demand", "Price", "⏳ Days Left", "🧠 Smart Reorder"].map((h) => (
+                <th
+                  key={h}
+                  className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em]"
+                  style={{
+                    color: "rgba(191,191,191,1)",
+                    borderBottom: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.map((row) => (
+              <React.Fragment key={row.id}>
+                <tr
+                  className="cursor-pointer transition-colors"
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+                  onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
+                  onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = "rgba(255,0,0,0.06)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}
+                >
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs" style={{ color: "#6E7681" }}>
+                        {expandedId === row.id ? "▾" : "▸"}
+                      </span>
+                      <span className="text-sm font-medium" style={{ color: "#E6EDF3" }}>
+                        {row.medicine}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs px-2 py-0.5 rounded-md"
+                      style={{ background: "rgba(255,255,255,0.06)", color: "#8B949E" }}>
+                      {row.category}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm tabular-nums" style={{ color: "#C9D1D9" }}>
+                    {row.stock.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-sm tabular-nums" style={{ color: "#C9D1D9" }}>
+                    {row.demand.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-sm tabular-nums" style={{ color: "#C9D1D9" }}>
+                    ${row.price.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <DaysLeftCell row={row} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <SmartReorderCell row={row} isSimulated={simulatedOrders.has(row.id)} />
+                  </td>
+                </tr>
+                {/* Expanded detail row */}
+                {expandedId === row.id && (
+                  <tr key={`${row.id}-detail`}>
+                    <td colSpan={7} className="px-6 py-4"
+                      style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {/* Stockout countdown bar */}
+                        <div className="rounded-xl p-4"
+                          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                          <StockoutBar days={row.daysUntilStockout} />
+                        </div>
+                        {/* Reorder details */}
+                        <div className="rounded-xl p-4"
+                          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                          <p className="text-[10px] uppercase tracking-wider mb-2.5" style={{ color: "#6E7681" }}>
+                            Reorder Details
+                          </p>
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span style={{ color: "#6E7681" }}>Reorder Point</span>
+                              <span className="font-medium" style={{ color: "#C9D1D9" }}>{row.reorderPoint} units</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span style={{ color: "#6E7681" }}>Avg Daily Sales</span>
+                              <span className="font-medium" style={{ color: "#C9D1D9" }}>{row.avgDailySales} units/day</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span style={{ color: "#6E7681" }}>Suggested Order</span>
+                              <span className="font-medium" style={{ color: "#C9D1D9" }}>{row.reorderRecommendation.suggestedQty} units</span>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Current stock vs reorder point */}
+                        <div className="rounded-xl p-4"
+                          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                          <p className="text-[10px] uppercase tracking-wider mb-2.5" style={{ color: "#6E7681" }}>
+                            Stock vs Reorder Point
+                          </p>
+                          <div className="w-full">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-xs" style={{ color: "#6E7681" }}>Current Stock</span>
+                              <span className="text-xs font-bold" style={{
+                                color: row.stock <= row.reorderPoint ? "#F85149" : "#3FB950"
+                              }}>
+                                {row.stock <= row.reorderPoint ? "⚠️ Below threshold" : "✅ Above threshold"}
+                              </span>
+                            </div>
+                            <div className="stockout-bar-track">
+                              <div
+                                className="stockout-bar-fill"
+                                style={{
+                                  width: `${Math.min(100, Math.round((row.stock / Math.max(row.stock, row.reorderPoint * 2)) * 100))}%`,
+                                  background: row.stock <= row.reorderPoint ? "#F85149" : "#3FB950",
+                                }}
+                              />
+                            </div>
+                            <div className="flex justify-between mt-1">
+                              <span className="text-[10px]" style={{ color: "#6E7681" }}>0</span>
+                              <span className="text-[10px]" style={{ color: "#6E7681" }}>
+                                Reorder @ {row.reorderPoint}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between px-4 py-3"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <p className="text-xs" style={{ color: "rgba(191,191,191,1)" }}>
+          Page {safePage} of {totalPages}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            disabled={safePage === 1}
+            className="rounded-lg px-3 py-1.5 text-xs disabled:opacity-40 transition-colors"
+            style={{
+              border: "1px solid rgba(255,255,255,0.16)",
+              color: "rgba(191,191,191,1)",
+              background: "transparent",
+            }}
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={safePage === totalPages}
+            className="rounded-lg px-3 py-1.5 text-xs disabled:opacity-40 transition-colors"
+            style={{
+              border: "1px solid rgba(255,255,255,0.16)",
+              color: "rgba(191,191,191,1)",
+              background: "transparent",
+            }}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Mock top drugs to seed inventory ─────────────────────────
+const MOCK_TOP_DRUGS = [
+  // High runners — will have low days-until-stockout → triggers alerts
+  { name: "M01AB Ibuprofen",       totalDemand: 8420, avgDemand: 95,  trend: "up" as const,     changePercent: 4.2 },
+  { name: "N02BE Paracetamol",     totalDemand: 7810, avgDemand: 88,  trend: "up" as const,     changePercent: 2.1 },
+  { name: "J01CA Amoxicillin",     totalDemand: 5940, avgDemand: 72,  trend: "down" as const,   changePercent: -1.5 },
+  { name: "R05DB Cough Syrup",     totalDemand: 4230, avgDemand: 60,  trend: "up" as const,     changePercent: 6.8 },
+  // Slow movers — ample stock
+  { name: "A11CC Vitamin D3",      totalDemand: 3800, avgDemand: 8,   trend: "stable" as const, changePercent: 0 },
+  { name: "J01FA Azithromycin",    totalDemand: 3120, avgDemand: 6,   trend: "down" as const,   changePercent: -3.2 },
+  { name: "N06AB Fluoxetine",      totalDemand: 2900, avgDemand: 9,   trend: "up" as const,     changePercent: 1.8 },
+  { name: "C09AA Lisinopril",      totalDemand: 2640, avgDemand: 7,   trend: "stable" as const, changePercent: 0.5 },
+  { name: "A10BA Metformin",       totalDemand: 2410, avgDemand: 10,  trend: "up" as const,     changePercent: 3.1 },
+  { name: "B01AC Aspirin Low-Dose",totalDemand: 2100, avgDemand: 5,   trend: "stable" as const, changePercent: -0.3 },
+];
+
 // ── Main page ────────────────────────────────────────────────
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Alert Tray state ──
+  const [showAlertTray, setShowAlertTray] = useState(false);
+  const [showReorderPlanner, setShowReorderPlanner] = useState(false);
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
+  const [simulatedOrders, setSimulatedOrders] = useState<Set<string>>(new Set());
+  const [activeAlerts, setActiveAlerts] = useState<AlertItem[]>([]);
+
+  // ── Inventory rows (single source of truth) ──
+  const inventoryRows: InventoryRow[] = useMemo(
+    () => buildInventoryRows(MOCK_TOP_DRUGS),
+    []
+  );
+
+  // ── AlertsEngine side-effect ──────────────────────────────
+  useEffect(() => {
+    const alerts = computeAlerts(inventoryRows);
+    setActiveAlerts(alerts);
+  }, [inventoryRows]);
+
+  // ── Dashboard API fetch ──────────────────────────────────
   useEffect(() => {
     fetch("/api/dashboard")
       .then((r) => r.json())
@@ -138,9 +455,35 @@ export default function DashboardPage() {
     data.charts.monthly[0]
   );
 
+  const visibleAlertCount = activeAlerts.filter((a) => !dismissedAlertIds.has(a.id)).length;
+
+  const handleDismissAlert = (id: string) => {
+    setDismissedAlertIds((prev) => new Set([...prev, id]));
+  };
+
+  const handleSimulateOrder = (id: string) => {
+    setSimulatedOrders((prev) => new Set([...prev, id]));
+  };
+
   return (
     <>
-      <Navbar title="EDA Dashboard" subtitle="Sales analytics · salesmonthly dataset" />
+      <Navbar
+        title="EDA Dashboard"
+        subtitle="Sales analytics · salesmonthly dataset"
+        alertCount={visibleAlertCount}
+        onBellClick={() => setShowAlertTray((v) => !v)}
+        onCalendarClick={() => setShowReorderPlanner((v) => !v)}
+      />
+
+      {/* ── Notification Tray (floating) ── */}
+      {showAlertTray && (
+        <NotificationTray
+          alerts={activeAlerts}
+          dismissedIds={dismissedAlertIds}
+          onDismiss={handleDismissAlert}
+          onClose={() => setShowAlertTray(false)}
+        />
+      )}
 
       <main className="space-y-5 p-5 pb-24 md:p-6 lg:p-7 lg:pb-8 max-w-[1400px] mx-auto">
 
@@ -366,6 +709,98 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            INVENTORY INTELLIGENCE — Systems 1, 2 & 3
+        ════════════════════════════════════════════════════════════════ */}
+
+        {/* ── Alert summary strip ── */}
+        {activeAlerts.filter((a) => !dismissedAlertIds.has(a.id)).length > 0 && (
+          <div
+            className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-3"
+            style={{
+              background: "rgba(218,54,51,0.05)",
+              border: "1px solid rgba(218,54,51,0.2)",
+            }}
+          >
+            <span className="h-2 w-2 rounded-full pulse-red" style={{ background: "#DA3633" }} />
+            <span className="text-sm font-medium" style={{ color: "#F87171" }}>
+              {activeAlerts.filter((a) => !dismissedAlertIds.has(a.id) && a.severity === "critical").length} critical ·{" "}
+              {activeAlerts.filter((a) => !dismissedAlertIds.has(a.id) && a.severity === "medium").length} medium alerts active
+            </span>
+            <button
+              onClick={() => setShowAlertTray(true)}
+              className="ml-auto text-xs font-medium px-3 py-1 rounded-lg transition-colors"
+              style={{
+                background: "rgba(218,54,51,0.1)",
+                border: "1px solid rgba(218,54,51,0.25)",
+                color: "#F87171",
+              }}
+            >
+              View Alerts →
+            </button>
+          </div>
+        )}
+
+        {/* ── Reorder Planner (inline panel) ── */}
+        {showReorderPlanner && (
+          <ReorderPlanner
+            rows={inventoryRows}
+            onClose={() => setShowReorderPlanner(false)}
+            simulatedOrders={simulatedOrders}
+            onSimulateOrder={handleSimulateOrder}
+          />
+        )}
+
+        {/* ── Inventory Intelligence Table ── */}
+        <SectionCard
+          title="Inventory Intelligence"
+          subtitle="Real-Time Stock Monitor · 10 Products"
+          accentColor="#FBBF24"
+          badge={
+            <div className="flex items-center gap-2">
+              {visibleAlertCount > 0 && (
+                <span
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold"
+                  style={{
+                    background: "rgba(248,81,73,0.1)",
+                    border: "1px solid rgba(248,81,73,0.25)",
+                    color: "#F85149",
+                  }}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#F85149" }} />
+                  {visibleAlertCount} alert{visibleAlertCount !== 1 ? "s" : ""}
+                </span>
+              )}
+              <button
+                onClick={() => setShowReorderPlanner((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all duration-200"
+                style={{
+                  background: showReorderPlanner ? "rgba(251,191,36,0.15)" : "rgba(251,191,36,0.08)",
+                  border: "1px solid rgba(251,191,36,0.25)",
+                  color: "#FBBF24",
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" strokeLinecap="round" />
+                  <line x1="8" y1="2" x2="8" y2="6" strokeLinecap="round" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                {showReorderPlanner ? "Hide Planner" : "Reorder Planner"}
+              </button>
+            </div>
+          }
+        >
+          <p className="mb-4 text-xs" style={{ color: "#6E7681" }}>
+            Click any row to expand product details · Bell = Alerts · Calendar = Reorder Planner
+          </p>
+          <InventoryTable
+            rows={inventoryRows}
+            simulatedOrders={simulatedOrders}
+          />
+        </SectionCard>
+
       </main>
     </>
   );

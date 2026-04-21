@@ -15,6 +15,14 @@ export interface BusinessKpis {
     forecastAccuracy: number | null;
 }
 
+export interface ReorderRecommendation {
+    orderIn: number;          // days until must place order
+    orderBy: string;          // ISO date string
+    suggestedQty: number;     // reorderPoint * 1.5
+    urgency: "urgent" | "soon" | "ok";
+    orderPlaced?: boolean;    // simulated order state
+}
+
 export interface InventoryRow {
     id: string;
     medicine: string;
@@ -22,6 +30,11 @@ export interface InventoryRow {
     demand: number;
     price: number;
     category: string;
+    // ── Computed fields (data layer, not render) ──
+    avgDailySales: number;
+    reorderPoint: number;
+    daysUntilStockout: number;
+    reorderRecommendation: ReorderRecommendation;
 }
 
 export interface ForecastChartPoint {
@@ -197,10 +210,44 @@ export function buildForecastComparison(
 }
 
 export function buildInventoryRows(topDrugs: TopDrug[]): InventoryRow[] {
+    const today = new Date();
+
     return topDrugs.map((item, index) => {
         const baseline = Math.max(12, Math.round(item.avgDemand));
         const stock = baseline * 4 + ((index % 3) * 15);
         const price = Number((28 + (index % 6) * 7.5 + (item.changePercent > 0 ? 3.2 : 0)).toFixed(2));
+
+        // ── Days-Until-Stockout Calculator ──────────────────────────
+        // avgDailySales = totalUnitsSoldLast30Days / 30
+        // totalUnitsSoldLast30Days approximated from avgDemand (already per-period avg)
+        const totalLast30Days = item.avgDemand * 2; // conservative estimate from avg
+        const avgDailySales = totalLast30Days > 0 ? totalLast30Days / 30 : 5; // fallback: 5/day
+        const daysUntilStockout = avgDailySales > 0
+            ? Math.round(stock / avgDailySales)
+            : 999;
+
+        // ── Smart Reorder Timing Engine ──────────────────────────────
+        const reorderPoint = Math.round(avgDailySales * 7); // 1 week coverage
+        const leadTimeDays = 3;   // default supplier lead time
+        const safetyBufferDays = 1;
+        const daysUntilMustOrder = daysUntilStockout - leadTimeDays - safetyBufferDays;
+
+        const orderByDate = new Date(today);
+        orderByDate.setDate(today.getDate() + Math.max(0, daysUntilMustOrder));
+        const orderBy = orderByDate.toISOString().split("T")[0];
+
+        const urgency: "urgent" | "soon" | "ok" =
+            daysUntilMustOrder <= 0 ? "urgent"
+            : daysUntilMustOrder <= 3 ? "soon"
+            : "ok";
+
+        const reorderRecommendation: ReorderRecommendation = {
+            orderIn: daysUntilMustOrder,
+            orderBy,
+            suggestedQty: Math.round(reorderPoint * 1.5),
+            urgency,
+            orderPlaced: false,
+        };
 
         return {
             id: `${item.name}-${index}`,
@@ -209,6 +256,10 @@ export function buildInventoryRows(topDrugs: TopDrug[]): InventoryRow[] {
             demand: Math.round(item.totalDemand),
             price,
             category: categorizeMedicine(item.name),
+            avgDailySales: Math.round(avgDailySales * 10) / 10,
+            reorderPoint,
+            daysUntilStockout,
+            reorderRecommendation,
         };
     });
 }

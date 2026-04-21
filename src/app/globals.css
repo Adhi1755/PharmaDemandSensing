@@ -259,6 +259,32 @@
   }
 }
 
+@layer utilities {
+  /* ── Stockout countdown bar ── */
+  .stockout-bar-track {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+  .stockout-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.6s ease;
+  }
+
+  /* ── Days-left cell colours ── */
+  .days-cell-red    { background: rgba(248,81,73,0.14);  color: #F85149; }
+  .days-cell-orange { background: rgba(249,115,22,0.12); color: #F97316; }
+  .days-cell-yellow { background: rgba(251,191,36,0.1);  color: #FBBF24; }
+  .days-cell-green  { background: rgba(63,185,80,0.1);   color: #3FB950; }
+
+  /* ── Notification tray slide-in ── */
+  .tray-slide-in {
+    animation: traySlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
 /* ── Keyframes ── */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -283,6 +309,11 @@
 @keyframes pulseRed {
   0%, 100% { box-shadow: 0 0 0 0 rgba(218, 54, 51, 0.6); }
   50% { box-shadow: 0 0 0 5px rgba(218, 54, 51, 0); }
+}
+
+@keyframes traySlideIn {
+  from { opacity: 0; transform: translateX(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 /* ── Scrollbar ── */
