@@ -6,10 +6,14 @@ import { useNavActions } from "@/context/NavActionsContext";
 import EDAKPISection from "@/components/dashboard/EDAKPISection";
 import NotificationTray from "@/components/dashboard/NotificationTray";
 import ReorderPlanner from "@/components/dashboard/ReorderPlanner";
+import RecommendationWidget from "@/components/dashboard/RecommendationWidget";
+import ExplainabilityPanel from "@/components/dashboard/ExplainabilityPanel";
 import { computeAlerts } from "@/lib/alerts-engine";
 import type { AlertItem } from "@/lib/alerts-engine";
 import { buildInventoryRows } from "@/lib/dashboard-data";
 import type { InventoryRow } from "@/lib/dashboard-data";
+import { computeAllExplainability } from "@/lib/explainability-engine";
+import type { ExplainabilityResult } from "@/lib/explainability-engine";
 
 // ── Lazy-load charts ───────────────────────────────────────────
 const SalesTrendChart = dynamic(() => import("@/charts/SalesTrendChart"), {
@@ -211,9 +215,11 @@ function StockoutBar({ days, max = 30 }: { days: number; max?: number }) {
 function InventoryTable({
   rows,
   simulatedOrders,
+  explainabilityMap,
 }: {
   rows: InventoryRow[];
   simulatedOrders: Set<string>;
+  explainabilityMap: Map<string, ExplainabilityResult>;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -352,6 +358,16 @@ function InventoryTable({
                           </div>
                         </div>
                       </div>
+
+                      {/* ── Feature 2: Explainability Panel ── */}
+                      {explainabilityMap.has(row.id) && (
+                        <div className="mt-4">
+                          <ExplainabilityPanel
+                            result={explainabilityMap.get(row.id)!}
+                            medicineName={row.medicine}
+                          />
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )}
@@ -432,6 +448,12 @@ export default function DashboardPage() {
   const inventoryRows: InventoryRow[] = useMemo(
     () => buildInventoryRows(MOCK_TOP_DRUGS),
     []
+  );
+
+  // ── Feature 2: Explainability map (recomputed whenever inventory refreshes) ──
+  const explainabilityMap = useMemo(
+    () => computeAllExplainability(inventoryRows),
+    [inventoryRows]
   );
 
   // ── AlertsEngine side-effect ──────────────────────────────
@@ -763,54 +785,94 @@ export default function DashboardPage() {
           />
         )}
 
-        {/* ── Inventory Intelligence Table ── */}
-        <SectionCard
-          title="Inventory Intelligence"
-          subtitle="Real-Time Stock Monitor · 10 Products"
-          accentColor="#FBBF24"
-          badge={
-            <div className="flex items-center gap-2">
-              {visibleAlertCount > 0 && (
-                <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold"
+        {/* ── Feature 1 + Inventory Intelligence (2-col layout) ── */}
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_340px]">
+
+          {/* Left: Inventory Intelligence Table */}
+          <SectionCard
+            title="Inventory Intelligence"
+            subtitle="Real-Time Stock Monitor · 10 Products"
+            accentColor="#FBBF24"
+            badge={
+              <div className="flex items-center gap-2">
+                {visibleAlertCount > 0 && (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold"
+                    style={{
+                      background: "rgba(248,81,73,0.1)",
+                      border: "1px solid rgba(248,81,73,0.25)",
+                      color: "#F85149",
+                    }}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#F85149" }} />
+                    {visibleAlertCount} alert{visibleAlertCount !== 1 ? "s" : ""}
+                  </span>
+                )}
+                <button
+                  onClick={() => setShowReorderPlanner((v) => !v)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all duration-200"
                   style={{
-                    background: "rgba(248,81,73,0.1)",
-                    border: "1px solid rgba(248,81,73,0.25)",
-                    color: "#F85149",
+                    background: showReorderPlanner ? "rgba(251,191,36,0.15)" : "rgba(251,191,36,0.08)",
+                    border: "1px solid rgba(251,191,36,0.25)",
+                    color: "#FBBF24",
                   }}
                 >
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#F85149" }} />
-                  {visibleAlertCount} alert{visibleAlertCount !== 1 ? "s" : ""}
-                </span>
-              )}
-              <button
-                onClick={() => setShowReorderPlanner((v) => !v)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all duration-200"
-                style={{
-                  background: showReorderPlanner ? "rgba(251,191,36,0.15)" : "rgba(251,191,36,0.08)",
-                  border: "1px solid rgba(251,191,36,0.25)",
-                  color: "#FBBF24",
-                }}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" strokeLinecap="round" />
+                    <line x1="8" y1="2" x2="8" y2="6" strokeLinecap="round" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                  {showReorderPlanner ? "Hide Planner" : "Reorder Planner"}
+                </button>
+              </div>
+            }
+          >
+            <p className="mb-4 text-xs" style={{ color: "#6E7681" }}>
+              Click any row to expand product details &amp; demand insights · Bell = Alerts · Calendar = Reorder Planner
+            </p>
+            <InventoryTable
+              rows={inventoryRows}
+              simulatedOrders={simulatedOrders}
+              explainabilityMap={explainabilityMap}
+            />
+          </SectionCard>
+
+          {/* Right: Feature 1 — Recommendation Widget */}
+          <div className="flex flex-col gap-4">
+            <RecommendationWidget inventoryRows={inventoryRows} />
+
+            {/* Context hint card */}
+            <div
+              className="rounded-2xl p-4"
+              style={{
+                background: "linear-gradient(145deg,rgba(18,22,30,0.92),rgba(10,14,20,0.88))",
+                border: "1px solid rgba(255,255,255,0.06)",
+              }}
+            >
+              <p
+                className="text-[10px] uppercase tracking-wider mb-2"
+                style={{ color: "#6E7681" }}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" strokeLinecap="round" />
-                  <line x1="8" y1="2" x2="8" y2="6" strokeLinecap="round" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-                {showReorderPlanner ? "Hide Planner" : "Reorder Planner"}
-              </button>
+                How it works
+              </p>
+              <ul className="space-y-1.5 text-xs" style={{ color: "#8B949E" }}>
+                <li className="flex items-start gap-2">
+                  <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#FBBF24" }} />
+                  Select a drug category from the dropdown above.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#FBBF24" }} />
+                  The engine uses supplier lead time &amp; safety buffer to compute the order deadline.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#FBBF24" }} />
+                  Card color signals urgency — red = today, orange = 3 days, green = this week.
+                </li>
+              </ul>
             </div>
-          }
-        >
-          <p className="mb-4 text-xs" style={{ color: "#6E7681" }}>
-            Click any row to expand product details · Bell = Alerts · Calendar = Reorder Planner
-          </p>
-          <InventoryTable
-            rows={inventoryRows}
-            simulatedOrders={simulatedOrders}
-          />
-        </SectionCard>
+          </div>
+        </div>
 
       </main>
     </>
